@@ -22,6 +22,8 @@ async function readJson(req){
   try{return JSON.parse(body)}catch{throw new Error('입력을 확인해 주세요.')}
 }
 const files={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/planner.js':['planner.js','text/javascript; charset=utf-8'],'/planner-core.mjs':['planner-core.mjs','text/javascript; charset=utf-8']};
+files['/ui.js']=['ui.js','text/javascript; charset=utf-8'];
+files['/design-assets.js']=['design-assets.js','text/javascript; charset=utf-8'];
 const server=http.createServer(async(req,res)=>{
   if(!allowedHosts.has(req.headers.host))return reply(res,403,{error:'허용되지 않은 접근입니다.'});
   const url=new URL(req.url,localUrl);
@@ -29,6 +31,11 @@ const server=http.createServer(async(req,res)=>{
   if(url.pathname.startsWith('/api/') && req.headers['sec-fetch-site']==='cross-site')return reply(res,403,{error:'허용되지 않은 접근입니다.'});
   try {
     if(req.method==='GET' && files[url.pathname]){const [file,type]=files[url.pathname];return reply(res,200,await readFile(path.join(root,'public',file)),type)}
+    if(req.method==='GET' && /^\/assets\/(?:figma\/[A-Za-z0-9-]+\.svg|noto-sans-kr-(?:400|500|700)\.woff2|OFL-NotoSansKR\.txt)$/.test(url.pathname)){
+      const type=url.pathname.endsWith('.svg')?'image/svg+xml':url.pathname.endsWith('.woff2')?'font/woff2':'text/plain; charset=utf-8';
+      try{return reply(res,200,await readFile(path.join(root,'public',url.pathname.slice(1))),type)}
+      catch(error){if(error.code==='ENOENT')return reply(res,404,{error:'파일을 찾을 수 없습니다.'});throw error}
+    }
     if(req.method==='GET' && url.pathname==='/api/health')return reply(res,200,{app:'timetable-demo',version:'0.1.0',pid:process.pid});
     if(req.method==='GET' && url.pathname==='/api/meta')return reply(res,200,{courses:courses.map(({sections,...course})=>course),defaultRequest,catalogInfo});
     if(req.method==='GET' && url.pathname==='/api/status')return reply(res,200,{...await bridge.status(),busy:recommendationBusy||bridge.busy});

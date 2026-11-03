@@ -1,6 +1,6 @@
 import {courses} from './catalog.mjs';
 export {courses} from './catalog.mjs';
-export const defaultRequest={requiredCourseIds:[],excludedCourseIds:[],preferredCourseIds:[],allowedDays:[0,1,2,3,4],earliestStart:540,latestEnd:1080,credits:{total:{min:13,max:15},major:{min:9,max:12},general:{min:4,max:6}},preferences:{late:true,friday:true,compact:false,travel:false,fewDays:true},note:''};
+export const defaultRequest={requiredCourseIds:[],excludedCourseIds:[],preferredCourseIds:[],allowedDays:[0,1,2,3,4],earliestStart:540,latestEnd:1080,credits:{total:{min:13,max:15},major:{min:9,max:12},general:{min:4,max:6}},preferences:{late:true,friday:true,compact:false,travel:false,fewDays:true,lunch:true,breaks:false},maxCoursesPerDay:3,note:''};
 const known=new Map(courses.map(c=>[c.id,c]));
 const preferenceKeys=Object.keys(defaultRequest.preferences);
 function ids(value,label){if(!Array.isArray(value)||value.length>courses.length||value.some(id=>!known.has(id))||new Set(value).size!==value.length)throw new Error(label+' 과목을 확인해 주세요.');return [...value].sort()}
@@ -18,16 +18,26 @@ export function validateRequest(raw){
     credits[key]={min:range.min,max:range.max};
   }
   if(credits.total.min<1)throw new Error('총 학점은 1학점 이상으로 설정해 주세요.');
-  const preferences={};for(const key of preferenceKeys){if(typeof raw.preferences?.[key]!=='boolean')throw new Error('선호 조건을 확인해 주세요.');preferences[key]=raw.preferences[key]}
+  const preferences={};for(const key of preferenceKeys){const value=raw.preferences?.[key]??(['lunch','breaks'].includes(key)?false:undefined);if(typeof value!=='boolean')throw new Error('선호 조건을 확인해 주세요.');preferences[key]=value}
+  const maxCoursesPerDay=raw.maxCoursesPerDay??null;
+  if(maxCoursesPerDay!==null&&(!Number.isInteger(maxCoursesPerDay)||maxCoursesPerDay<1||maxCoursesPerDay>8))throw new Error('하루 수업량은 1~8과목으로 선택해 주세요.');
   if(typeof raw.note!=='string'||raw.note.length>400)throw new Error('AI 요청은 400자 이내로 입력해 주세요.');
-  return {requiredCourseIds,excludedCourseIds,preferredCourseIds,allowedDays:[...raw.allowedDays].sort(),earliestStart,latestEnd,credits,preferences,note:raw.note.trim()};
+  return {requiredCourseIds,excludedCourseIds,preferredCourseIds,allowedDays:[...raw.allowedDays].sort(),earliestStart,latestEnd,credits,preferences,maxCoursesPerDay,note:raw.note.trim()};
 }
 export function hasConflict(sections){const events=sections.flatMap(s=>s.meetings);return events.some((a,i)=>events.slice(i+1).some(b=>a[0]===b[0]&&a[1]<b[2]&&a[2]>b[1]))}
-function measure(sections){
-  const metrics={days:0,dayList:[],morningClasses:0,fridayClasses:0,gapMinutes:0,buildingChanges:0};
+export function measure(sections){
+  const metrics={days:0,dayList:[],morningClasses:0,fridayClasses:0,gapMinutes:0,buildingChanges:0,maxDailyCourses:0,longestDayMinutes:0,lunchMissedDays:0,backToBackClasses:0};
   for(let day=0;day<5;day++){
     const events=sections.flatMap(s=>s.meetings.filter(m=>m[0]===day).map(m=>({start:m[1],end:m[2],building:s.building}))).sort((a,b)=>a.start-b.start);
     if(events.length){metrics.days++;metrics.dayList.push(day)}
+    metrics.maxDailyCourses=Math.max(metrics.maxDailyCourses,events.length);
+    metrics.longestDayMinutes=Math.max(metrics.longestDayMinutes,events.reduce((n,e)=>n+e.end-e.start,0));
+    if(events.length){
+      const lunch=events.filter(e=>e.start<840&&e.end>720);let cursor=720,largest=0;
+      for(const e of lunch){largest=Math.max(largest,Math.max(720,e.start)-cursor);cursor=Math.max(cursor,Math.min(840,e.end))}
+      largest=Math.max(largest,840-cursor);if(largest<60)metrics.lunchMissedDays++;
+      metrics.backToBackClasses+=events.filter((e,i)=>i>0&&e.start-events[i-1].end<30).length;
+    }
     events.forEach((event,i)=>{if(event.start<720)metrics.morningClasses++;if(day===4)metrics.fridayClasses++;if(i){metrics.gapMinutes+=event.start-events[i-1].end;if(event.building!==events[i-1].building)metrics.buildingChanges++}});
   }
   return metrics;
@@ -36,7 +46,7 @@ function candidate(sections,request){
   const metrics=measure(sections),p=request.preferences;
   const majorCredits=sections.filter(s=>s.kind==='major').reduce((n,s)=>n+s.credits,0),generalCredits=sections.filter(s=>s.kind==='general').reduce((n,s)=>n+s.credits,0);
   const matched=sections.filter(s=>request.preferredCourseIds.includes(s.courseId)).length;
-  const cost=(p.late?metrics.morningClasses*10:0)+(p.friday?metrics.fridayClasses*16:0)+(p.compact?metrics.gapMinutes/20:0)+(p.travel?metrics.buildingChanges*4:0)+(p.fewDays?metrics.days*12:0)-matched*20;
+  const cost=(p.late?metrics.morningClasses*10:0)+(p.friday?metrics.fridayClasses*16:0)+(p.compact?metrics.gapMinutes/20:0)+(p.travel?metrics.buildingChanges*4:0)+(p.fewDays?metrics.days*12:0)+(p.lunch?metrics.lunchMissedDays*25:0)+(p.breaks?metrics.backToBackClasses*9:0)+(request.maxCoursesPerDay?Math.max(0,metrics.maxDailyCourses-request.maxCoursesPerDay)*18:0)-matched*20;
   return {id:sections.map(s=>s.id).sort().join('_'),sections,metrics,credits:majorCredits+generalCredits,majorCredits,generalCredits,cost:Math.round(cost*10)/10};
 }
 function compare(a,b){return a.cost-b.cost||a.id.localeCompare(b.id)}

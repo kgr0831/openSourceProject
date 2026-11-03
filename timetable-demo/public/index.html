@@ -1,74 +1,21 @@
 <!doctype html>
 <html lang="ko">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>숭실대 시간표 추천</title><link rel="stylesheet" href="/style.css"></head>
-<body><div class="app">
-<header class="header"><div class="brand"><span aria-hidden="true" class="brand-icon">▦</span>숭실대 시간표 추천</div><span id="catalog-count" class="demo-label">AI소프트웨어학부 · 교양</span></header>
-<nav class="view-nav" aria-label="서비스 메뉴"><button type="button" data-view="recommend" aria-pressed="true">시간표 추천</button><button type="button" data-view="calendar" aria-pressed="false">학기 캘린더</button><button type="button" data-view="experience" aria-pressed="false">수강 경험</button></nav>
-<p id="planner-message" class="message" role="status" aria-live="polite" hidden></p>
-<section id="recommend-view">
-<section class="connection" aria-label="AI 계정 연결">
-<div class="connection-icon" aria-hidden="true">✦</div><div class="connection-copy"><h2 id="connection-title">Codex 연결 확인 중</h2><p id="connection-description">이 PC의 로그인 상태를 확인하고 있어요.</p></div>
-<span id="connection-badge" class="badge neutral">확인 중</span><button id="connect" class="button secondary" disabled>Codex 연결</button><button id="cancel-login" class="button quiet" hidden>취소</button>
-</section>
-<form id="preferences-form"><fieldset id="inputs">
-<details class="career-panel" open><summary><strong>진로에서 과목 찾기</strong><span>관심 분야와 학습 단계를 시간표에 연결해요.</span></summary>
-<div class="career-controls"><label>관심 분야<select id="career-track"></select></label><label>학습 단계<select id="career-stage"><option value="0">기초</option><option value="1">핵심</option><option value="2">심화</option></select></label><button id="career-apply" type="button" class="button secondary">관심 과목으로 적용</button></div>
-<div id="career-roadmap" class="career-roadmap"></div><details class="completed-panel"><summary>이미 이수한 과목 제외</summary><div id="completed-courses" class="completed-courses"></div></details>
-<p class="field-note">진로 탐색용 예시 순서예요. 공식 선수과목·수강 자격을 뜻하지 않으며, 이수 과목을 체크한 뒤 적용하면 추천에서 제외해요.</p></details>
-<section class="ai-panel">
-<div class="ai-title"><h1>원하는 시간표를 말해 주세요.</h1><span class="subtle">과목도 자동으로 선택해요.</span></div>
-<label for="note" class="sr-only">AI에게 요청할 시간표 조건</label>
-<div class="prompt-row"><textarea id="note" maxlength="400" rows="2" placeholder="예: 수요일에만 전공 6학점과 교양 2학점을 듣고 싶어. 교양은 알아서 골라줘."></textarea><button id="recommend" class="button primary" type="submit">✦ AI로 시간표 짜기</button></div>
-<div id="presets" class="presets" aria-label="요청 예시"><button type="button" data-preset="wednesday">수요일만 8학점</button><button type="button" data-preset="balanced">전공 9 + 교양 4</button><button type="button" data-preset="general">교양만 6학점</button><button type="button" data-preset="twoDays">월·수에 모아 듣기</button></div>
-<p id="action-hint" class="field-note">예시로 시작하거나 아래 조건을 직접 바꿔 보세요. AI 요청은 추천 버튼을 누르면 적용돼요.</p>
-</section>
-<main class="workspace">
-<aside class="settings">
-<div class="section-heading"><h2>시간표 조건</h2><button id="reset" class="button quiet" type="button">초기화</button></div>
-<section class="input-section"><h3>등교 가능한 요일</h3><div id="days" class="day-picker"></div><div class="time-range"><label>첫 수업 이후<select id="earliestStart" aria-label="수업 시작 가능 시간"></select></label><span>~</span><label>마지막 수업 이전<select id="latestEnd" aria-label="수업 종료 한도 시간"></select></label></div></section>
-<section class="input-section"><h3>이번 학기 학점</h3><div class="credit-head"><span></span><span>최소</span><span></span><span>최대</span></div>
-<div class="credit-row"><label for="total-min">총 학점</label><input id="total-min" type="number" min="1" max="24" aria-label="총 최소 학점"><span>~</span><input id="total-max" type="number" min="1" max="24" aria-label="총 최대 학점"></div>
-<div class="credit-row"><label for="major-min">전공</label><input id="major-min" type="number" min="0" max="24" aria-label="전공 최소 학점"><span>~</span><input id="major-max" type="number" min="0" max="24" aria-label="전공 최대 학점"></div>
-<div class="credit-row"><label for="general-min">교양</label><input id="general-min" type="number" min="0" max="24" aria-label="교양 최소 학점"><span>~</span><input id="general-max" type="number" min="0" max="24" aria-label="교양 최대 학점"></div>
-<p class="field-note">같은 숫자를 넣으면 정확히 맞춰요.<br>전공은 전공기초·필수·선택을 포함해요.</p></section>
-<section class="input-section"><h3>가능하면 이렇게</h3><div id="preferences" class="preference-list"></div></section>
-<button id="preview" class="button secondary full" type="button">조건대로 기본 추천</button>
-<p id="course-selection-count" class="field-note">과목은 자동 선택 · 아래 목록에서 포함·제외 지정</p>
-</aside>
-<section class="results" aria-label="추천 시간표">
-<div class="results-header"><div><h2>추천 시간표 <span id="result-count" class="count">0</span></h2><p id="result-context" class="subtle">조건을 확인하고 있어요.</p></div><span id="result-source" class="badge neutral">기본 추천</span></div>
-<div id="condition-summary" class="condition-summary" aria-label="적용된 조건"></div>
-<p id="interpretation" class="interpretation" hidden></p>
-<div id="message" class="message" role="status" aria-live="polite" hidden></div>
-<div id="candidate-tabs" class="candidate-tabs" aria-label="추천 후보"></div>
-<div class="timetable-panel" id="timetable-panel" hidden>
-<div class="timetable-heading"><strong id="timetable-title">추천 1</strong><div id="metrics" class="metrics"></div></div>
-<div class="timetable-scroll"><div class="timetable"><div class="week-header"><span></span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span></div><div class="week-body"><div id="time-labels" class="time-labels"></div><div id="week-columns" class="week-columns"></div></div></div></div>
-</div>
-<div class="recommendation-note" id="recommendation-note" hidden><span aria-hidden="true">✦</span><div><h3 id="reason-title">추천 이유</h3><p id="reason"></p></div></div>
-<div id="selected-courses" class="selected-courses" aria-label="추천에 포함된 과목"></div>
-<div id="semester-save" class="semester-save" hidden><div><h3>이 시간표로 학기 시작하기</h3><p class="field-note">날짜는 예시값이에요. 실제 학기 기간을 입력하면 가상 수업 일정을 캘린더에 저장합니다.</p></div><label>시작일<input id="semester-start" type="date" aria-label="학기 시작일"></label><label>종료일<input id="semester-end" type="date" aria-label="학기 종료일"></label><button id="confirm-timetable" type="button" class="button primary">학기 캘린더로 저장</button></div>
-</section>
-</main>
-<details id="catalog" class="catalog-panel"><summary><strong>과목 목록</strong><span id="catalog-description">필수 포함·제외 지정</span></summary>
-<div class="catalog-tools"><label class="sr-only" for="course-search">과목명·분야 검색</label><input id="course-search" type="search" placeholder="과목명·분야 검색"><label class="sr-only" for="course-kind">과목 종류</label><select id="course-kind"><option value="all">전체 과목</option><option value="major">AI소프트웨어학부 전공</option><option value="general">숭실대 교양</option><option value="chosen">포함·제외 지정한 과목</option></select></div>
-<div id="courses" class="catalog-grid"></div><p id="catalog-empty" class="subtle" hidden>검색 결과가 없습니다.</p>
-</details>
-</fieldset></form>
-</section>
-<section id="calendar-view" class="service-view" hidden aria-labelledby="calendar-title">
-<div class="page-heading"><div><span class="eyebrow">확정한 시간표, 한 학기 동안</span><h1 id="calendar-title">학기 캘린더</h1><p id="semester-label" class="subtle">시간표를 저장하면 날짜별 수업이 생겨요.</p></div><button id="export-calendar" type="button" class="button secondary" disabled>캘린더 내보내기 (.ics)</button></div>
-<div id="calendar-empty" class="empty-state"><h2>아직 저장한 시간표가 없어요.</h2><p>추천 시간표를 고르고 학기 시작일·종료일을 입력해 주세요.</p><button type="button" class="button primary" data-view="recommend">시간표 고르기</button></div>
-<div id="calendar-content" hidden>
-<div id="calendar-highlights" class="calendar-highlights"></div>
-<div class="calendar-layout"><div class="month-panel"><div class="section-heading"><h2>날짜별 일정</h2><input id="calendar-month" type="month" aria-label="표시할 월"></div><div class="month-weekdays" aria-hidden="true"><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div><div id="month-grid" class="month-grid"></div><p class="field-note">초록 점: 수업 · 주황 점: 시험·보강·개인 일정<br>모든 시간은 한국 시간 기준이에요.</p></div>
-<div class="agenda-panel"><div class="agenda-toolbar"><button id="previous-week" type="button" class="button quiet" aria-label="이전 주">←</button><strong id="week-label"></strong><button id="next-week" type="button" class="button quiet" aria-label="다음 주">→</button><button id="calendar-today" type="button" class="button secondary">오늘</button><button id="add-event" type="button" class="button primary">일정 추가</button></div><div id="week-agenda"></div></div></div>
-<p class="privacy-note">일정과 수강 기록은 이 브라우저에만 저장돼요. 학교 공지는 직접 확인해 입력하고, 휴일·휴강은 직접 반영해 주세요. 내보내기는 파일 저장 방식이며 자동 동기화는 하지 않아요.</p>
-</div></section>
-<section id="experience-view" class="service-view" hidden aria-labelledby="experience-title"><div class="page-heading"><div><span class="eyebrow">다른 선택을 참고하고, 내 선택을 기록하기</span><h1 id="experience-title">수강 경험</h1><p class="subtle">AI소프트웨어학부 · 조언과 과목 조합을 추천 조건에 연결해요.</p></div><span class="badge neutral">게시판 시연</span></div>
-<p class="demo-disclosure">아래 조언은 기능 시연용 예시이며 실제 선배의 후기가 아닙니다. 내 기록은 공개되지 않고 이 브라우저에만 남아요.</p><div id="experience-examples" class="experience-grid"></div>
-<div class="experience-writing"><div><h2>내 시간표 기록</h2><p class="subtle">현재 선택한 추천 시간표와 함께 조언을 저장해요.</p><p id="experience-selection" class="field-note"></p></div><form id="experience-form"><label>기록 제목<input id="experience-name" maxlength="80" required placeholder="예: 이번 학기에 이 과목을 고른 이유"></label><label>다음 학기의 나에게 남길 조언<textarea id="experience-body" maxlength="600" required rows="3" placeholder="관심 분야, 선택 이유, 다음에 바꾸고 싶은 점을 적어 주세요."></textarea></label><button class="button primary" type="submit">내 브라우저에 저장</button></form></div><div id="experience-records" class="experience-records"></div></section>
-<dialog id="event-dialog"><form id="event-form"><div class="section-heading"><h2 id="event-dialog-title">일정 추가</h2><button id="close-event" class="button quiet" type="button" aria-label="일정 창 닫기">닫기</button></div><p id="event-error" class="message error" role="alert" hidden></p>
-<label>일정 이름<input id="event-title" maxlength="100" required></label><div class="editor-grid"><label>날짜<input id="event-date" type="date" required></label><label>종류<select id="event-kind"><option value="class">수업</option><option value="exam">시험</option><option value="makeup">보강</option><option value="personal">개인 일정</option></select></label><label>시작<input id="event-start" type="time" required></label><label>종료<input id="event-end" type="time" required></label></div><label>장소<input id="event-location" maxlength="100" placeholder="예: 정보과학관 101호"></label><label id="event-course-label">연결할 과목<select id="event-course"></select></label><label id="event-scope-label">적용 범위<select id="event-scope"><option value="one">이번 일정만</option><option value="future">같은 요일 수업의 이후 일정도</option></select></label><p id="event-edit-hint" class="field-note"></p><div class="dialog-actions"><button id="cancel-event" type="button" class="button secondary">휴강 표시</button><button id="restore-event" type="button" class="button secondary">원래 수업 복원</button><button type="submit" class="button primary">저장</button></div></form></dialog>
-<footer id="data-notice">과목명·학점은 숭실대 교육과정 기준. 시간·분반·강의실은 가상입니다.</footer>
-</div><script src="/app.js" type="module"></script></body></html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f8fa">
+  <meta name="description" content="과목과 생활 패턴으로 만드는 나에게 맞는 대학 시간표">
+  <title>캠퍼스 시간표</title>
+  <link rel="icon" href="/assets/figma/start-imgGrid.svg" type="image/svg+xml">
+  <link rel="preload" href="/assets/noto-sans-kr-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#content">본문으로 이동</a>
+  <div id="app"><main class="boot" role="status">시간표를 준비하고 있어요.</main></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="dialog" aria-labelledby="dialog-title"></dialog>
+  <noscript>시간표를 사용하려면 브라우저의 JavaScript를 켜 주세요.</noscript>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
