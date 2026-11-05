@@ -23,9 +23,9 @@ test('새 선호를 생략한 기존 요청을 허용하고 하루 수업량 범
   for(const value of [0,9,2.5,'3'])assert.throws(()=>validateRequest({...request,maxCoursesPerDay:value}),/하루 수업량/);
 });
 
-test('점심·연강·하루 수업량은 필수 과목을 제거하지 않는 선호 점수',()=>{
+test('점심·연강·하루 수업량은 필수 과목을 제거하지 않는 선호 점수',async()=>{
   const request={...structuredClone(defaultRequest),requiredCourseIds:['ds','algo','db'],allowedDays:[0,1,2,3],earliestStart:600,credits:{total:{min:13,max:13},major:{min:9,max:9},general:{min:4,max:4}},maxCoursesPerDay:1,preferences:Object.fromEntries(Object.keys(defaultRequest.preferences).map(k=>[k,['lunch','breaks'].includes(k)]))};
-  const result=generateCandidates(request);assert.ok(result.total>0);
+  const result=await generateCandidates(request);assert.ok(result.total>0);
   for(const c of result.candidates){assert.ok(request.requiredCourseIds.every(id=>c.sections.some(s=>s.courseId===id)));assert.ok(c.metrics.maxDailyCourses>1);assert.equal(c.cost,c.metrics.lunchMissedDays*25+c.metrics.backToBackClasses*9+(c.metrics.maxDailyCourses-1)*18)}
 });
 

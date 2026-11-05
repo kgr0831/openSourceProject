@@ -1,0 +1,246 @@
+{
+  "recorded_at": "2026-11-05T18:00:26.928Z",
+  "input": {
+    "catalog": {
+      "version": "acceptance-synthetic-v1",
+      "sections": [
+        {
+          "section_id": "A",
+          "course_id": "A",
+          "name": "기초 과목",
+          "term": "2026-2",
+          "credits": 1,
+          "meetings": [
+            {
+              "day": 1,
+              "start": 540,
+              "end": 600
+            }
+          ]
+        },
+        {
+          "section_id": "B",
+          "course_id": "B",
+          "name": "실습 과목",
+          "term": "2026-2",
+          "credits": 1,
+          "meetings": [
+            {
+              "day": 1,
+              "start": 600,
+              "end": 660
+            }
+          ]
+        },
+        {
+          "section_id": "C1",
+          "course_id": "C",
+          "name": "선택 과목",
+          "term": "2026-2",
+          "credits": 1,
+          "meetings": [
+            {
+              "day": 1,
+              "start": 660,
+              "end": 720
+            }
+          ]
+        },
+        {
+          "section_id": "C2",
+          "course_id": "C",
+          "name": "선택 과목",
+          "term": "2026-2",
+          "credits": 1,
+          "meetings": [
+            {
+              "day": 1,
+              "start": 670,
+              "end": 730
+            }
+          ]
+        }
+      ]
+    },
+    "request": {
+      "term": "2026-2",
+      "catalog_version": "acceptance-synthetic-v1",
+      "constraints": {
+        "allowed_weekdays": [
+          1
+        ],
+        "credits": {
+          "min": 3,
+          "max": 3
+        },
+        "required_course_ids": [
+          "A",
+          "B",
+          "C"
+        ],
+        "morning": {
+          "before_minute": 720,
+          "unit": "meeting",
+          "max": 3
+        }
+      },
+      "ranking": {
+        "mode": "lexicographic",
+        "profile": "compact"
+      },
+      "selection": {
+        "mode": "top_k",
+        "k": 3
+      },
+      "search_options": {
+        "time_limit_seconds": 0.001,
+        "workers": 1,
+        "seed": 42
+      }
+    },
+    "mode": "recommend"
+  },
+  "result": {
+    "engine": "ortools-cp-sat",
+    "engine_version": "9.15.6755",
+    "model_build_id": "fbd7beed-9f85-489f-8116-29aaa5bbcf73",
+    "catalog_version_or_hash": "11b52e31ec5979bf34297fcd787e39a2a03e2ed37749508d051c3a0d7f3e228d",
+    "catalog_version": "acceptance-synthetic-v1",
+    "credit_scale": 1,
+    "normalized_request": {
+      "term": "2026-2",
+      "catalog_version": "acceptance-synthetic-v1",
+      "constraints": {
+        "allowed_weekdays": [
+          1
+        ],
+        "credits": {
+          "min": 3,
+          "max": 3
+        },
+        "required_course_ids": [
+          "A",
+          "B",
+          "C"
+        ],
+        "morning": {
+          "before_minute": 720,
+          "unit": "meeting",
+          "max": 3
+        },
+        "excluded_course_ids": [],
+        "excluded_section_ids": [],
+        "locked_section_ids": [],
+        "earliest_start": 0,
+        "latest_end": 1440,
+        "lunch": {
+          "enabled": false
+        }
+      },
+      "ranking": {
+        "mode": "lexicographic",
+        "profile": "compact"
+      },
+      "selection": {
+        "mode": "top_k",
+        "k": 3
+      },
+      "search_options": {
+        "time_limit_seconds": 0.001,
+        "workers": 1,
+        "seed": 42
+      },
+      "relaxation_policy": {
+        "max_changed": 0,
+        "rules": {},
+        "scope": "minimum_cost_only"
+      },
+      "legacy_preferences": {
+        "preferred_course_ids": [],
+        "late": false,
+        "friday": false,
+        "compact": false,
+        "travel": false,
+        "fewDays": false,
+        "lunch": false,
+        "breaks": false
+      }
+    },
+    "mode": "recommend",
+    "original_status": "BUDGET_EXHAUSTED",
+    "original_constraints": {
+      "allowed_weekdays": [
+        1
+      ],
+      "credits": {
+        "min": 3,
+        "max": 3
+      },
+      "required_course_ids": [
+        "A",
+        "B",
+        "C"
+      ],
+      "morning": {
+        "before_minute": 720,
+        "unit": "meeting",
+        "max": 3
+      },
+      "excluded_course_ids": [],
+      "excluded_section_ids": [],
+      "locked_section_ids": [],
+      "earliest_start": 0,
+      "latest_end": 1440,
+      "lunch": {
+        "enabled": false
+      }
+    },
+    "effective_constraints": {
+      "allowed_weekdays": [
+        1
+      ],
+      "credits": {
+        "min": 3,
+        "max": 3
+      },
+      "required_course_ids": [
+        "A",
+        "B",
+        "C"
+      ],
+      "morning": {
+        "before_minute": 720,
+        "unit": "meeting",
+        "max": 3
+      },
+      "excluded_course_ids": [],
+      "excluded_section_ids": [],
+      "locked_section_ids": [],
+      "earliest_start": 0,
+      "latest_end": 1440,
+      "lunch": {
+        "enabled": false
+      }
+    },
+    "changes": [],
+    "phase_results": [],
+    "proven_objective_prefix": [],
+    "minimality_proven": false,
+    "minimum_relaxation_cost": null,
+    "ranking_proven": false,
+    "coverage": "partial",
+    "termination_reason": "BUDGET_EXHAUSTED",
+    "coverage_scope": {
+      "mode": "original",
+      "relaxation_cost": null
+    },
+    "returned_unique_count": 0,
+    "total_unique_count_or_null": null,
+    "recommendations": [],
+    "diagnostics": [],
+    "warnings": [
+      "시간·분반·강의실의 실제 개설 여부와 수강 자격은 별도 확인이 필요합니다."
+    ],
+    "elapsed_seconds": 0.0011701999992510537
+  }
+}

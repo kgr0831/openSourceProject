@@ -1,0 +1,11 @@
+{
+  "artifact": "rulebase_configuration_and_specification",
+  "json_and_cross_references_valid": true,
+  "constraint_rule_count": 10,
+  "preference_profile_count": 3,
+  "ortools_acceptance_check_count": 14,
+  "exact_exclusion_identity_assignments_checked": 5460,
+  "cp_sat_implementation_included": false,
+  "cp_sat_executed_in_this_task": false,
+  "user_node_code_reviewed": false
+}

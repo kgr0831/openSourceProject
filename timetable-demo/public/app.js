@@ -1,6 +1,7 @@
+import {hardConditions,updateHardCondition,relaxationDialog,relaxationPolicy,changesNotice} from './solver-ui.js';
 import {createPlannerStore} from './planner.js';
 import {careerTracks,careerSelection,kindLabels,createSemesterEvents,editEvents,validateEvent,conflictPairs,exportCalendar,parseDate,addDays,weekStart,koreanToday,timeText,timeValue} from './planner-core.mjs';
-import {esc,icon,button,link,heading,info,field,toggle,tabs,footer,timetable,layoutTimetables,layoutTabs,animateElements,dayNames,compareOptions,longestDay} from './ui.js';
+import {esc,icon,button,link,heading,info,field,toggle,tabs,footer,timetable,layoutTimetables,layoutTabs,animateElements,dayNames,longestDay} from './ui.js';
 
 const $=id=>document.getElementById(id);
 const store=createPlannerStore({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)});
@@ -84,7 +85,7 @@ function preferencesView(){
 function creditFields(){return ['total','major','general'].map((k,i)=>'<div class="credit-range"><span>'+['총 학점','전공','교양'][i]+'</span>'+['min','max'].map((b,j)=>(j?'<span>~</span>':'')+'<input type="number" min="'+(k==='total'?1:0)+'" max="24" data-credit="'+k+'" data-bound="'+b+'" aria-label="'+['총 학점','전공','교양'][i]+(j?' 최대':' 최소')+'" value="'+state.request.credits[k][b]+'">').join('')+'</div>').join('')}
 function advancedView(){
   const r=state.request;
-  return body(heading('조금 더 나답게','가능하면 반영할 조건이에요.<br>필수 과목과 가능한 시간은 그대로 유지돼요.')+
+  return body(heading('조금 더 나답게','추천 기준과 꼭 필요한 조건을 정해요.')+hardConditions(r)+
     field('하루의 수업량','<select id="daily-limit">'+[null,2,3,4,5,6].map(n=>'<option value="'+(n??'')+'" '+(n===r.maxCoursesPerDay?'selected':'')+'>'+(n?'하루 최대 '+n+'과목':'상관없음')+'</option>').join('')+'</select>')+
     toggle('breaks','연강을 줄이고 싶어요',r.preferences.breaks,'수업 사이 30분 이상 여유를 선호해요.')+
     toggle('lunch','점심시간 확보',r.preferences.lunch,'12시부터 14시 사이에 1시간을 비워요.')+
@@ -101,14 +102,15 @@ function comparisonCard(c,i){
 }
 function resultsView(){
   const c=current();if(!c)return emptyView();
-  const applied=state.resultRequest||state.request;
+  const applied=structuredClone(state.resultRequest||state.request);
+  if(c.solverResult?.effective_constraints)applied.credits.total=c.solverResult.effective_constraints.credits;
   const earliest=Math.min(...c.sections.flatMap(s=>s.meetings.map(m=>m[1])));
   const flags='✓ 필수 '+applied.requiredCourseIds.length+'과목 포함'+(!c.metrics.dayList.includes(4)?'　✓ 금요일 공강':'');
   const summary='<div class="metrics">'+[[c.credits+'학점','이번 학기'],[c.metrics.days+'일','등교'],[timeText(earliest),'첫 수업']].map(([v,l])=>'<div><strong>'+v+'</strong><span>'+l+'</span></div>').join('')+'</div>';
   return body('<div class="desktop-heading">'+heading('나에게 맞는 한 주를 골라요','필수 과목과 가능한 시간을 만족하는 추천안이에요.')+'</div><div class="mobile-only">'+heading('이런 한 주는 어때요?')+'</div>'+
     '<div class="compare-layout"><div class="schedule-main"><div class="mobile-only">'+candidateTabs()+summary+'</div><div class="desktop-only table-tools"><h2>'+esc(c.strategy)+'</h2><span class="chip">'+c.credits+'학점 · 등교 '+c.metrics.days+'일</span></div><div class="timetable-surface">'+timetable(c)+'</div>'+
-    '<div class="recommendation-reason"><p class="accent-text">'+flags+'</p><p>'+reason(c)+'</p>'+(c.metrics.lunchMissedDays?'<small>점심 1시간을 확보하지 못한 날이 '+c.metrics.lunchMissedDays+'일 있어요.</small>':'')+'</div>'+link('조건 다시 조정하기','preferences')+
-    '<details class="disclosure"><summary>과목과 추천 이유 자세히</summary><p>'+esc(c.aiReason||'필수 조건을 지킨 유효 후보 중 서로 다른 시간표를 골랐어요.')+'</p>'+c.sections.map(s=>'<p>'+esc(s.name)+' · '+s.credits+'학점</p>').join('')+'<p>적용 조건: '+applied.allowedDays.map(d=>dayNames[d]).join('·')+' / '+timeText(applied.earliestStart)+'–'+timeText(applied.latestEnd)+' / 총 '+applied.credits.total.min+'–'+applied.credits.total.max+'학점</p>'+(state.interpretation?.summary?'<p>'+esc(state.interpretation.summary)+'</p>':'')+(state.interpretation?.unsupported?.length?'<p>반영하지 못한 요청: '+state.interpretation.unsupported.map(esc).join(', ')+'</p>':'')+'<small>수업 시간·분반·강의실은 가상 데이터예요.</small></details></div>'+
+    changesNotice(c)+'<div class="recommendation-reason"><p class="accent-text">'+flags+'</p><p>'+reason(c)+'</p>'+(c.metrics.lunchMissedDays?'<small>점심 1시간을 확보하지 못한 날이 '+c.metrics.lunchMissedDays+'일 있어요.</small>':'')+'</div>'+link('조건 다시 조정하기','preferences')+
+    '<details class="disclosure"><summary>과목과 추천 이유 자세히</summary><p>'+esc(c.aiReason||'필수 조건을 지킨 유효 후보 중 서로 다른 시간표를 골랐어요.')+'</p>'+c.sections.map(s=>'<p>'+esc(s.name)+' · '+s.credits+'학점</p>').join('')+'<p>'+esc(c.solverResult?.ranking_proven?'선택한 기준에서 우선순위를 확인한 결과예요.':'시간 안에 찾은 결과예요. 더 좋은 조합이 있을 수 있어요.')+'</p>'+'<p>적용 조건: '+applied.allowedDays.map(d=>dayNames[d]).join('·')+' / '+timeText(applied.earliestStart)+'–'+timeText(applied.latestEnd)+' / 총 '+applied.credits.total.min+'–'+applied.credits.total.max+'학점</p>'+(state.interpretation?.summary?'<p>'+esc(state.interpretation.summary)+'</p>':'')+(state.interpretation?.unsupported?.length?'<p>반영하지 못한 요청: '+state.interpretation.unsupported.map(esc).join(', ')+'</p>':'')+'<small>수업 시간·분반·강의실은 가상 데이터예요.</small></details></div>'+
     '<aside class="comparison-side desktop-only"><h2>나에게 중요한 기준</h2>'+state.options.map(comparisonCard).join('')+
     '<div class="criteria"><strong>모든 추천안에서 유지했어요</strong><p>✓ '+(applied.requiredCourseIds.map(id=>esc(state.courses.find(c=>c.id===id)?.name)).join(' · ')||'수업 시간 겹침 없음')+'</p><p>✓ 총 '+applied.credits.total.min+'–'+applied.credits.total.max+'학점 · '+timeText(applied.earliestStart)+' 이후 수업</p></div>'+button('이 시간표 저장','confirm')+'</aside></div>','wide-body')+
     '<div class="mobile-only">'+footer(button('이 시간표로 정하기','confirm'))+'</div>';
@@ -185,7 +187,7 @@ function recordView(){
     field('이 조합을 고른 이유','<textarea name="body" id="note-body" required maxlength="600" rows="6" placeholder="수업을 고른 이유와 기대하는 점을 자유롭게 적어 보세요.">'+esc(state.noteBody)+'</textarea>')+'<p class="form-error" id="record-error" role="alert"></p></form>')+
     footer(button('내 기록 저장하기','save-record','primary',c?'':'disabled'),'다른 사람에게 공개되지 않아요');
 }
-function emptyView(){return body('<div class="state-illustration">'+icon('empty','imgSearch')+'</div>'+heading('조건을 조금만 바꿔 볼까요?','현재 조건에서는 시간표를 찾지 못했어요.')+'<div class="card">'+state.diagnostics.map(d=>'<p>'+esc(d)+'</p>').join('')+'</div>'+info('필수 과목은 그대로','등교 요일이나 수업 시간을 넓혀 보세요.',icon('empty','imgBook')))+footer(link('조건 조정하기','preferences','primary'))}
+function emptyView(){const infeasible=state.solver?.original_status==='INFEASIBLE';return body('<div class="state-illustration">'+icon('empty','imgSearch')+'</div>'+heading(infeasible?'조건을 조금만 바꿔 볼까요?':'조금 더 찾아볼까요?',infeasible?'현재 필수 조건을 모두 만족하는 시간표가 없어요.':'시간 안에 결과를 찾지 못했어요. 다시 시도할 수 있어요.')+'<div class="card">'+state.diagnostics.map(d=>'<p>'+esc(d)+'</p>').join('')+'</div>'+(infeasible&&state.lastMode!=='alternative'?button('허용할 변경 범위 고르기','relax-options','secondary'):button('다시 찾아보기','retry','secondary')))+footer(link('조건 조정하기','preferences','primary'))}
 function loadingView(){return body('<div class="state-illustration loading-symbol">'+icon('loading','imgSpark')+'</div>'+heading('나에게 맞는 한 주를 찾고 있어요','과목이 겹치지 않는지 확인하고<br>생활 패턴에 맞는 조합을 비교해요.')+'<div class="loading-line" role="progressbar" aria-label="추천 생성 중"></div><p class="muted center">'+(state.lastMode==='ai'?'AI가 요청을 해석하고 이유를 정리하고 있어요.':'유효한 시간표를 비교하고 있어요.')+'</p>')+footer(link('조건으로 돌아가기','preferences','secondary'))}
 function errorView(){return body('<div class="state-illustration">'+icon('error','imgAlert')+'</div>'+heading('잠시 확인이 필요해요',esc(state.error||'다시 시도하거나 조건을 확인해 주세요.'))+info('입력한 조건은 그대로예요','설정을 바꾸지 않고 다시 시도할 수 있어요.',icon('error','imgGrid')))+footer(button('다시 시도하기','retry')+link('조건 확인하기','preferences','secondary'))}
 function aiView(){
@@ -224,16 +226,17 @@ function routeChanged(){
   window.scrollTo(0,0);render('page');document.querySelector('h1')?.focus({preventScroll:true});
   if(next==='ai')checkConnection();
 }
-async function recommend(mode='rules'){
+async function recommend(mode='rules',payload){
   if(state.busy)return;
-  state.lastMode=mode;state.busy=true;const version=++requestVersion;state.controller=new AbortController();
+  state.lastMode=mode;if(payload)state.retryPayload=payload;else if(!['relax','alternative'].includes(mode))state.retryPayload=null;state.busy=true;const version=++requestVersion;state.controller=new AbortController();
   go('loading');
-  const timeout=setTimeout(()=>state.controller?.abort(),mode==='ai'?240000:20000);
+  const timeout=setTimeout(()=>state.controller?.abort(),mode==='ai'?240000:30000);
   try{
-    const result=await api(mode==='ai'?'recommend':'candidates',state.request,state.controller.signal);
+    const route=({ai:'recommend',relax:'relax',alternative:'alternatives'})[mode]||'candidates';
+    const result=await api(route,payload||state.retryPayload||state.request,state.controller.signal);
     if(version!==requestVersion)return;
-    state.request=result.request;state.resultRequest=structuredClone(result.request);state.interpretation=result.interpretation||null;state.diagnostics=result.diagnostics||[];
-    state.options=mode==='ai'&&result.recommendations?.length?result.recommendations.map((r,i)=>({...result.candidates.find(c=>c.id===r.id),strategy:'AI 추천 '+(i+1),aiReason:r.reason})):compareOptions(result.candidates);
+    if(!['relax','alternative'].includes(mode))state.request=result.request;state.solver=result.solver;state.resultRequest=structuredClone(result.request);state.interpretation=result.interpretation||null;state.diagnostics=result.diagnostics||[];
+    state.options=mode==='ai'&&result.recommendations?.length?result.recommendations.map((r,i)=>({...result.candidates.find(c=>c.id===r.id),strategy:'AI 추천 '+(i+1),aiReason:r.reason})):result.candidates;
     state.active=0;state.source=result.source||'rules';state.busy=false;go(state.options.length?'results':'empty');
     if(result.interpretation?.summary)flash(result.interpretation.summary);
   }catch(e){if(version!==requestVersion)return;state.busy=false;state.error=e.name==='AbortError'?'응답이 오래 걸리고 있어요. 잠시 뒤 다시 시도해 주세요.':e.message;go('error')}
@@ -244,11 +247,11 @@ function closeDialog(){$('dialog').close()}
 function confirmSemester(){
   const today=koreanToday(),year=today.slice(0,4),second=Number(today.slice(5,7))>=7;
   const start=store.data.semester?.start||year+(second?'-09-01':'-03-02'),end=store.data.semester?.end||year+(second?'-12-20':'-06-20');
-  dialog('<div class="dialog-heading"><h2 id="dialog-title">이번 학기 시간표로 저장</h2>'+button('×','close-dialog','icon-button','aria-label="닫기"')+'</div><p>학기 기간을 정하면 수업 일정을 함께 만들어요.</p><form id="semester-form" class="stack">'+field('학기 시작일','<input name="start" type="date" required value="'+start+'">')+field('학기 종료일','<input name="end" type="date" required value="'+end+'">')+(store.data.semester?'<label class="replace-confirm"><input name="replace" type="checkbox" required>기존 학기 일정과 변경 내역을 새 시간표로 교체합니다. 수강 기록은 유지돼요.</label>':'')+'<p id="semester-error" class="form-error" role="alert"></p><button type="submit" class="button primary">내 시간표로 저장</button></form>');
+  dialog(changesNotice(current())+'<div class="dialog-heading"><h2 id="dialog-title">이번 학기 시간표로 저장</h2>'+button('×','close-dialog','icon-button','aria-label="닫기"')+'</div><p>학기 기간을 정하면 수업 일정을 함께 만들어요.</p><form id="semester-form" class="stack">'+field('학기 시작일','<input name="start" type="date" required value="'+start+'">')+field('학기 종료일','<input name="end" type="date" required value="'+end+'">')+(store.data.semester?'<label class="replace-confirm"><input name="replace" type="checkbox" required>기존 학기 일정과 변경 내역을 새 시간표로 교체합니다. 수강 기록은 유지돼요.</label>':'')+'<p id="semester-error" class="form-error" role="alert"></p><button type="submit" class="button primary">내 시간표로 저장</button></form>');
 }
 function showSection(courseId){
   const c=state.route==='saved'?store.data.semester?.candidate:current(),s=c?.sections.find(s=>s.courseId===courseId);if(!s)return;
-  dialog('<div class="dialog-heading"><h2 id="dialog-title">'+esc(s.name)+'</h2>'+button('×','close-dialog','icon-button','aria-label="닫기"')+'</div><span class="chip">'+esc(s.classification)+' · '+s.credits+'학점</span><div class="section-detail"><p>'+s.meetings.map(([d,f,t])=>dayNames[d]+'요일 '+timeText(f)+' ~ '+timeText(t)).join('<br>')+'</p><p>'+esc(s.building)+'</p><small>수업 시간·분반·강의실은 가상 데이터예요.</small></div>'+(state.route==='saved'?button('날짜별 일정 보기','section-calendar','primary','data-id="'+esc(courseId)+'"'):button('확인','close-dialog')));
+  dialog('<div class="dialog-heading"><h2 id="dialog-title">'+esc(s.name)+'</h2>'+button('×','close-dialog','icon-button','aria-label="닫기"')+'</div><span class="chip">'+esc(s.classification)+' · '+s.credits+'학점</span><div class="section-detail"><p>'+s.meetings.map(([d,f,t])=>dayNames[d]+'요일 '+timeText(f)+' ~ '+timeText(t)).join('<br>')+'</p><p>'+esc(s.building)+'</p><small>수업 시간·분반·강의실은 가상 데이터예요.</small></div><div class="stack compact">'+button('이 분반 대신 다른 분반 찾기','alternative','secondary','data-id="'+esc(s.id)+'"')+(state.route==='saved'?button('날짜별 일정 보기','section-calendar','primary','data-id="'+esc(courseId)+'"'):button('확인','close-dialog'))+'</div>');
 }
 function openEvent(id){const e=store.data.events.find(e=>e.id===id);if(!e)return;state.editing=id;state.eventDraft={...e};state.eventReturn=state.route==='saved'?'saved':'calendar';go('event')}
 function addEvent(){if(!store.data.semester){go('courses');return}state.editing=null;state.eventDraft={title:'',date:state.selectedDate,start:720,end:780,location:'',kind:'personal'};state.eventReturn='calendar';go('event')}
@@ -281,6 +284,17 @@ async function act(action,el){
     case 'candidate':if(state.active!==Number(el.dataset.value)){state.active=Number(el.dataset.value);render('schedule')}break;
     case 'recommend':await recommend();break;
     case 'recommend-ai':await recommend('ai');break;
+    case 'relax-options':dialog(relaxationDialog(state.request));break;
+    case 'alternative':{
+      const c=state.route==='saved'?store.data.semester?.candidate:current();
+      if(!c)return;
+      const request=structuredClone(c.requestSnapshot||state.resultRequest||state.request);
+      const effective=c.solverResult?.effective_constraints;
+      if(effective){request.credits.total=effective.credits;request.attendanceDays=effective.attendance_days;request.morning=effective.morning;request.lunch=effective.lunch}
+      request.relaxationPolicy={max_changed:0,rules:{}};
+      const baseline={section_ids:c.sections.map(s=>s.id).sort(),failed_section_ids:[el.dataset.id],allow_course_replacement:false,preserve_credit_total:true};
+      closeDialog();await recommend('alternative',{request,baseline});break;
+    }
     case 'retry':if(!state.request)await init();else await recommend(state.lastMode);break;
     case 'confirm':confirmSemester();break;
     case 'close-dialog':closeDialog();break;
@@ -319,6 +333,7 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('change',e=>{
   const el=e.target,r=state.request;if(!r)return;
+  updateHardCondition(r,el);
   if(el.dataset.pref)r.preferences[el.dataset.pref]=el.checked;
   if(el.dataset.day!==undefined){const d=Number(el.dataset.day);r.allowedDays=el.checked?[...r.allowedDays,d].sort():r.allowedDays.filter(x=>x!==d);el.nextElementSibling.textContent=(el.checked?'✓ ':'')+dayNames[d]}
   if(['earliestStart','latestEnd'].includes(el.id))r[el.id]=Number(el.value);
@@ -328,7 +343,9 @@ document.addEventListener('change',e=>{
   if(el.id==='calendar-date'&&el.value){state.selectedDate=el.value;render()}
 });
 document.addEventListener('submit',e=>{
-  e.preventDefault();if(e.target.id==='semester-form'){
+  e.preventDefault();if(e.target.id==='relax-form'){
+    try{const request=structuredClone(state.request);request.relaxationPolicy=relaxationPolicy(request,e.target);closeDialog();recommend('relax',request)}catch(error){$('relax-error').textContent=error.message}
+  }else if(e.target.id==='semester-form'){
     try{const f=new FormData(e.target);store.setSemester(current(),String(f.get('start')),String(f.get('end')));const today=koreanToday();state.selectedDate=today>=f.get('start')&&today<=f.get('end')?today:String(f.get('start'));closeDialog();go('saved');flash('시간표와 학기 일정을 저장했어요.')}catch(error){$('semester-error').textContent=error.message}
   }else if(e.target.id==='event-form')saveEvent();else if(e.target.id==='record-form')act('save-record',e.target);
 });
