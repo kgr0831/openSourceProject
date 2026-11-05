@@ -1,0 +1,767 @@
+{
+  "recorded_at": "2026-11-05T18:00:26.079Z",
+  "input": {
+    "catalog": {
+      "version": "acceptance-synthetic-v1",
+      "sections": [
+        {
+          "section_id": "A",
+          "course_id": "A",
+          "name": "기초 과목",
+          "term": "2026-2",
+          "credits": 1,
+          "meetings": [
+            {
+              "day": 1,
+              "start": 540,
+              "end": 600
+            }
+          ]
+        },
+        {
+          "section_id": "B",
+          "course_id": "B",
+          "name": "실습 과목",
+          "term": "2026-2",
+          "credits": 1,
+          "meetings": [
+            {
+              "day": 1,
+              "start": 600,
+              "end": 660
+            }
+          ]
+        },
+        {
+          "section_id": "C1",
+          "course_id": "C",
+          "name": "선택 과목",
+          "term": "2026-2",
+          "credits": 1,
+          "meetings": [
+            {
+              "day": 1,
+              "start": 660,
+              "end": 720
+            }
+          ]
+        },
+        {
+          "section_id": "C2",
+          "course_id": "C",
+          "name": "선택 과목",
+          "term": "2026-2",
+          "credits": 1,
+          "meetings": [
+            {
+              "day": 1,
+              "start": 670,
+              "end": 730
+            }
+          ]
+        }
+      ]
+    },
+    "request": {
+      "term": "2026-2",
+      "catalog_version": "acceptance-synthetic-v1",
+      "constraints": {
+        "allowed_weekdays": [
+          1
+        ],
+        "credits": {
+          "min": 3,
+          "max": 3
+        },
+        "required_course_ids": [
+          "A",
+          "B",
+          "C"
+        ],
+        "morning": {
+          "before_minute": 720,
+          "unit": "meeting",
+          "max": 2
+        }
+      },
+      "ranking": {
+        "mode": "lexicographic",
+        "profile": "compact"
+      },
+      "selection": {
+        "mode": "top_k",
+        "k": 3
+      },
+      "search_options": {
+        "time_limit_seconds": 5,
+        "workers": 1,
+        "seed": 42
+      },
+      "relaxation_policy": {
+        "max_changed": 1,
+        "rules": {
+          "morning_limit": {
+            "allow": true,
+            "importance": 2,
+            "step": 1,
+            "allowed_values": [
+              3,
+              4
+            ]
+          }
+        }
+      }
+    },
+    "mode": "relax"
+  },
+  "result": {
+    "engine": "ortools-cp-sat",
+    "engine_version": "9.15.6755",
+    "model_build_id": "7d2de898-a818-4a6c-9afb-d36a966d047e",
+    "catalog_version_or_hash": "11b52e31ec5979bf34297fcd787e39a2a03e2ed37749508d051c3a0d7f3e228d",
+    "catalog_version": "acceptance-synthetic-v1",
+    "credit_scale": 1,
+    "normalized_request": {
+      "term": "2026-2",
+      "catalog_version": "acceptance-synthetic-v1",
+      "constraints": {
+        "allowed_weekdays": [
+          1
+        ],
+        "credits": {
+          "min": 3,
+          "max": 3
+        },
+        "required_course_ids": [
+          "A",
+          "B",
+          "C"
+        ],
+        "morning": {
+          "before_minute": 720,
+          "unit": "meeting",
+          "max": 2
+        },
+        "excluded_course_ids": [],
+        "excluded_section_ids": [],
+        "locked_section_ids": [],
+        "earliest_start": 0,
+        "latest_end": 1440,
+        "lunch": {
+          "enabled": false
+        }
+      },
+      "ranking": {
+        "mode": "lexicographic",
+        "profile": "compact"
+      },
+      "selection": {
+        "mode": "top_k",
+        "k": 3
+      },
+      "search_options": {
+        "time_limit_seconds": 5,
+        "workers": 1,
+        "seed": 42
+      },
+      "relaxation_policy": {
+        "max_changed": 1,
+        "rules": {
+          "morning_limit": {
+            "allow": true,
+            "importance": 2,
+            "step": 1,
+            "allowed_values": [
+              3,
+              4
+            ]
+          }
+        },
+        "scope": "minimum_cost_only"
+      },
+      "legacy_preferences": {
+        "preferred_course_ids": [],
+        "late": false,
+        "friday": false,
+        "compact": false,
+        "travel": false,
+        "fewDays": false,
+        "lunch": false,
+        "breaks": false
+      }
+    },
+    "mode": "relax",
+    "original_status": "INFEASIBLE",
+    "original_constraints": {
+      "allowed_weekdays": [
+        1
+      ],
+      "credits": {
+        "min": 3,
+        "max": 3
+      },
+      "required_course_ids": [
+        "A",
+        "B",
+        "C"
+      ],
+      "morning": {
+        "before_minute": 720,
+        "unit": "meeting",
+        "max": 2
+      },
+      "excluded_course_ids": [],
+      "excluded_section_ids": [],
+      "locked_section_ids": [],
+      "earliest_start": 0,
+      "latest_end": 1440,
+      "lunch": {
+        "enabled": false
+      }
+    },
+    "effective_constraints": {
+      "allowed_weekdays": [
+        1
+      ],
+      "credits": {
+        "min": 3,
+        "max": 3
+      },
+      "required_course_ids": [
+        "A",
+        "B",
+        "C"
+      ],
+      "morning": {
+        "before_minute": 720,
+        "unit": "meeting",
+        "max": 3
+      },
+      "excluded_course_ids": [],
+      "excluded_section_ids": [],
+      "locked_section_ids": [],
+      "earliest_start": 0,
+      "latest_end": 1440,
+      "lunch": {
+        "enabled": false
+      }
+    },
+    "changes": [
+      {
+        "condition": "morning_limit",
+        "from": 2,
+        "to": 3,
+        "units": 1,
+        "importance": 2
+      }
+    ],
+    "phase_results": [
+      {
+        "stage": "original/feasibility",
+        "model_build_id": "7d2de898-a818-4a6c-9afb-d36a966d047e",
+        "raw_status": "INFEASIBLE",
+        "objective_value": null,
+        "best_bound": null,
+        "elapsed_seconds": 0.0023094999996828847,
+        "remaining_seconds_before": 4.998900300000059,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": false
+      },
+      {
+        "stage": "relax/rank:1/changed_condition_count",
+        "model_build_id": "92a75093-39fd-46cb-9699-7de112d2a22d",
+        "raw_status": "OPTIMAL",
+        "objective_value": 1,
+        "best_bound": 1,
+        "elapsed_seconds": 0.002963899999485875,
+        "remaining_seconds_before": 4.995151499999338,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:1/sum_changed_importance",
+        "model_build_id": "92a75093-39fd-46cb-9699-7de112d2a22d",
+        "raw_status": "OPTIMAL",
+        "objective_value": 2,
+        "best_bound": 2,
+        "elapsed_seconds": 0.0007275999996636529,
+        "remaining_seconds_before": 4.991881199999625,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:1/sum_normalized_change_units",
+        "model_build_id": "92a75093-39fd-46cb-9699-7de112d2a22d",
+        "raw_status": "OPTIMAL",
+        "objective_value": 1,
+        "best_bound": 1,
+        "elapsed_seconds": 0.0007123000004867208,
+        "remaining_seconds_before": 4.990898000000016,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:1/total_gap_minutes",
+        "model_build_id": "92a75093-39fd-46cb-9699-7de112d2a22d",
+        "raw_status": "OPTIMAL",
+        "objective_value": 0,
+        "best_bound": 0,
+        "elapsed_seconds": 0.0007191999993665377,
+        "remaining_seconds_before": 4.989962199999354,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:1/latest_end",
+        "model_build_id": "92a75093-39fd-46cb-9699-7de112d2a22d",
+        "raw_status": "OPTIMAL",
+        "objective_value": 720,
+        "best_bound": 720,
+        "elapsed_seconds": 0.0007031000004644739,
+        "remaining_seconds_before": 4.988931099999718,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:1/max_daily_teaching_minutes",
+        "model_build_id": "92a75093-39fd-46cb-9699-7de112d2a22d",
+        "raw_status": "OPTIMAL",
+        "objective_value": 180,
+        "best_bound": 180,
+        "elapsed_seconds": 0.0006545000005644397,
+        "remaining_seconds_before": 4.988032399999611,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:1/morning_meeting_count",
+        "model_build_id": "92a75093-39fd-46cb-9699-7de112d2a22d",
+        "raw_status": "OPTIMAL",
+        "objective_value": 3,
+        "best_bound": 3,
+        "elapsed_seconds": 0.0006703999997625942,
+        "remaining_seconds_before": 4.987185399999362,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:1/canonical_section_id_list/0",
+        "model_build_id": "92a75093-39fd-46cb-9699-7de112d2a22d",
+        "raw_status": "OPTIMAL",
+        "objective_value": 1,
+        "best_bound": 1,
+        "elapsed_seconds": 0.0007148000004235655,
+        "remaining_seconds_before": 4.9862050000001545,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:1/canonical_section_id_list/1",
+        "model_build_id": "92a75093-39fd-46cb-9699-7de112d2a22d",
+        "raw_status": "OPTIMAL",
+        "objective_value": 2,
+        "best_bound": 2,
+        "elapsed_seconds": 0.0007626999995409278,
+        "remaining_seconds_before": 4.98521829999936,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:1/canonical_section_id_list/2",
+        "model_build_id": "92a75093-39fd-46cb-9699-7de112d2a22d",
+        "raw_status": "OPTIMAL",
+        "objective_value": 3,
+        "best_bound": 3,
+        "elapsed_seconds": 0.0007930000001579174,
+        "remaining_seconds_before": 4.984187299999576,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:1/canonical_section_id_list/3",
+        "model_build_id": "92a75093-39fd-46cb-9699-7de112d2a22d",
+        "raw_status": "OPTIMAL",
+        "objective_value": 0,
+        "best_bound": 0,
+        "elapsed_seconds": 0.0007736999996268423,
+        "remaining_seconds_before": 4.983139999999366,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:2/changed_condition_count",
+        "model_build_id": "906cbd88-ae27-435c-b145-379e320ca8e7",
+        "raw_status": "OPTIMAL",
+        "objective_value": 1,
+        "best_bound": 1,
+        "elapsed_seconds": 0.0006691000007776893,
+        "remaining_seconds_before": 4.980576999999357,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:2/sum_changed_importance",
+        "model_build_id": "906cbd88-ae27-435c-b145-379e320ca8e7",
+        "raw_status": "OPTIMAL",
+        "objective_value": 2,
+        "best_bound": 2,
+        "elapsed_seconds": 0.0006272000000535627,
+        "remaining_seconds_before": 4.97968899999978,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:2/sum_normalized_change_units",
+        "model_build_id": "906cbd88-ae27-435c-b145-379e320ca8e7",
+        "raw_status": "OPTIMAL",
+        "objective_value": 1,
+        "best_bound": 1,
+        "elapsed_seconds": 0.0005332999999154708,
+        "remaining_seconds_before": 4.978854500000125,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:2/total_gap_minutes",
+        "model_build_id": "906cbd88-ae27-435c-b145-379e320ca8e7",
+        "raw_status": "OPTIMAL",
+        "objective_value": 10,
+        "best_bound": 10,
+        "elapsed_seconds": 0.0004552000000330736,
+        "remaining_seconds_before": 4.978145799999766,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:2/latest_end",
+        "model_build_id": "906cbd88-ae27-435c-b145-379e320ca8e7",
+        "raw_status": "OPTIMAL",
+        "objective_value": 730,
+        "best_bound": 730,
+        "elapsed_seconds": 0.00044460000026447233,
+        "remaining_seconds_before": 4.977472300000045,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:2/max_daily_teaching_minutes",
+        "model_build_id": "906cbd88-ae27-435c-b145-379e320ca8e7",
+        "raw_status": "OPTIMAL",
+        "objective_value": 180,
+        "best_bound": 180,
+        "elapsed_seconds": 0.00042810000013560057,
+        "remaining_seconds_before": 4.976872100000037,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:2/morning_meeting_count",
+        "model_build_id": "906cbd88-ae27-435c-b145-379e320ca8e7",
+        "raw_status": "OPTIMAL",
+        "objective_value": 3,
+        "best_bound": 3,
+        "elapsed_seconds": 0.0004237000002831337,
+        "remaining_seconds_before": 4.976303699999335,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:2/canonical_section_id_list/0",
+        "model_build_id": "906cbd88-ae27-435c-b145-379e320ca8e7",
+        "raw_status": "OPTIMAL",
+        "objective_value": 1,
+        "best_bound": 1,
+        "elapsed_seconds": 0.00046380000003409805,
+        "remaining_seconds_before": 4.9756603999994695,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:2/canonical_section_id_list/1",
+        "model_build_id": "906cbd88-ae27-435c-b145-379e320ca8e7",
+        "raw_status": "OPTIMAL",
+        "objective_value": 2,
+        "best_bound": 2,
+        "elapsed_seconds": 0.0005522999999811873,
+        "remaining_seconds_before": 4.974995300000046,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:2/canonical_section_id_list/2",
+        "model_build_id": "906cbd88-ae27-435c-b145-379e320ca8e7",
+        "raw_status": "OPTIMAL",
+        "objective_value": 4,
+        "best_bound": 4,
+        "elapsed_seconds": 0.0005246000000624917,
+        "remaining_seconds_before": 4.9741948000000775,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": true
+      },
+      {
+        "stage": "relax/rank:3/changed_condition_count",
+        "model_build_id": "5d040a10-99f5-45f6-9a05-5f3bbff3d8be",
+        "raw_status": "INFEASIBLE",
+        "objective_value": null,
+        "best_bound": 0,
+        "elapsed_seconds": 0.00014879999980621506,
+        "remaining_seconds_before": 4.972553199999311,
+        "relative_gap_limit": 0,
+        "absolute_gap_limit": 0,
+        "proven": false
+      }
+    ],
+    "proven_objective_prefix": [
+      "changed_condition_count",
+      "sum_changed_importance",
+      "sum_normalized_change_units",
+      "total_gap_minutes",
+      "latest_end",
+      "max_daily_teaching_minutes",
+      "morning_meeting_count",
+      "canonical_section_id_list"
+    ],
+    "minimality_proven": true,
+    "minimum_relaxation_cost": [
+      1,
+      2,
+      1
+    ],
+    "ranking_proven": true,
+    "coverage": "exhaustive",
+    "termination_reason": "EXHAUSTED",
+    "coverage_scope": {
+      "mode": "minimum_cost_only",
+      "relaxation_cost": [
+        1,
+        2,
+        1
+      ]
+    },
+    "returned_unique_count": 2,
+    "total_unique_count_or_null": 2,
+    "recommendations": [
+      {
+        "section_ids": [
+          "A",
+          "B",
+          "C1"
+        ],
+        "metrics": {
+          "attendance_days": 1,
+          "day_list": [
+            1
+          ],
+          "total_gap_minutes": 0,
+          "latest_end": 720,
+          "max_daily_teaching_minutes": 180,
+          "morning_meeting_count": 3,
+          "morning_day_count": 1,
+          "friday_classes": 0,
+          "building_changes": 0,
+          "max_daily_courses": 3,
+          "lunch_missed_days": 0,
+          "back_to_back_classes": 2,
+          "legacy_morning_count": 3,
+          "legacy_cost_units": 0,
+          "credits": 3
+        },
+        "model_metrics": {
+          "attendance_days": 1,
+          "total_gap_minutes": 0,
+          "latest_end": 720,
+          "max_daily_teaching_minutes": 180,
+          "morning_meeting_count": 3,
+          "morning_day_count": 1,
+          "max_daily_courses": 3,
+          "changed_condition_count": 1,
+          "sum_changed_importance": 2,
+          "sum_normalized_change_units": 1
+        },
+        "effective_constraints": {
+          "allowed_weekdays": [
+            1
+          ],
+          "credits": {
+            "min": 3,
+            "max": 3
+          },
+          "required_course_ids": [
+            "A",
+            "B",
+            "C"
+          ],
+          "morning": {
+            "before_minute": 720,
+            "unit": "meeting",
+            "max": 3
+          },
+          "excluded_course_ids": [],
+          "excluded_section_ids": [],
+          "locked_section_ids": [],
+          "earliest_start": 0,
+          "latest_end": 1440,
+          "lunch": {
+            "enabled": false
+          }
+        },
+        "changes": [
+          {
+            "condition": "morning_limit",
+            "from": 2,
+            "to": 3,
+            "units": 1,
+            "importance": 2
+          }
+        ],
+        "lunch_intervals": [],
+        "model_build_id": "92a75093-39fd-46cb-9699-7de112d2a22d",
+        "profile": "compact",
+        "personalized": false,
+        "proven_objective_prefix": [
+          "changed_condition_count",
+          "sum_changed_importance",
+          "sum_normalized_change_units",
+          "total_gap_minutes",
+          "latest_end",
+          "max_daily_teaching_minutes",
+          "morning_meeting_count",
+          "canonical_section_id_list"
+        ],
+        "ranking_proven": true,
+        "rank_termination": "OPTIMAL",
+        "validation": {
+          "effective_valid": true,
+          "original_valid": false,
+          "original_violations": [
+            "H009"
+          ]
+        }
+      },
+      {
+        "section_ids": [
+          "A",
+          "B",
+          "C2"
+        ],
+        "metrics": {
+          "attendance_days": 1,
+          "day_list": [
+            1
+          ],
+          "total_gap_minutes": 10,
+          "latest_end": 730,
+          "max_daily_teaching_minutes": 180,
+          "morning_meeting_count": 3,
+          "morning_day_count": 1,
+          "friday_classes": 0,
+          "building_changes": 0,
+          "max_daily_courses": 3,
+          "lunch_missed_days": 0,
+          "back_to_back_classes": 2,
+          "legacy_morning_count": 3,
+          "legacy_cost_units": 0,
+          "credits": 3
+        },
+        "model_metrics": {
+          "attendance_days": 1,
+          "total_gap_minutes": 10,
+          "latest_end": 730,
+          "max_daily_teaching_minutes": 180,
+          "morning_meeting_count": 3,
+          "morning_day_count": 1,
+          "max_daily_courses": 3,
+          "changed_condition_count": 1,
+          "sum_changed_importance": 2,
+          "sum_normalized_change_units": 1
+        },
+        "effective_constraints": {
+          "allowed_weekdays": [
+            1
+          ],
+          "credits": {
+            "min": 3,
+            "max": 3
+          },
+          "required_course_ids": [
+            "A",
+            "B",
+            "C"
+          ],
+          "morning": {
+            "before_minute": 720,
+            "unit": "meeting",
+            "max": 3
+          },
+          "excluded_course_ids": [],
+          "excluded_section_ids": [],
+          "locked_section_ids": [],
+          "earliest_start": 0,
+          "latest_end": 1440,
+          "lunch": {
+            "enabled": false
+          }
+        },
+        "changes": [
+          {
+            "condition": "morning_limit",
+            "from": 2,
+            "to": 3,
+            "units": 1,
+            "importance": 2
+          }
+        ],
+        "lunch_intervals": [],
+        "model_build_id": "906cbd88-ae27-435c-b145-379e320ca8e7",
+        "profile": "compact",
+        "personalized": false,
+        "proven_objective_prefix": [
+          "changed_condition_count",
+          "sum_changed_importance",
+          "sum_normalized_change_units",
+          "total_gap_minutes",
+          "latest_end",
+          "max_daily_teaching_minutes",
+          "morning_meeting_count",
+          "canonical_section_id_list"
+        ],
+        "ranking_proven": true,
+        "rank_termination": "OPTIMAL",
+        "validation": {
+          "effective_valid": true,
+          "original_valid": false,
+          "original_violations": [
+            "H009"
+          ]
+        }
+      }
+    ],
+    "diagnostics": [],
+    "warnings": [
+      "시간·분반·강의실의 실제 개설 여부와 수강 자격은 별도 확인이 필요합니다."
+    ],
+    "elapsed_seconds": 0.027666200000567187
+  }
+}

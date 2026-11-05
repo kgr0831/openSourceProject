@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": {"start": "node server.mjs --open", "test": "node --test tests/*.test.mjs"},
+  "scripts": {"start": "node server.mjs --open", "setup:solver": "node scripts/setup-solver.mjs", "solve": "node scripts/solve.mjs", "test": "node --test tests/*.test.mjs", "test:solver": "node scripts/test-solver.mjs"},
   "engines": {"node": ">=20"}
 }

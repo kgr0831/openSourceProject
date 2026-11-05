@@ -17,6 +17,8 @@ try {
     if (-not $nodePath) { throw 'Node.js 20 이상이 필요합니다.' }
     $nodeVersion = & $nodePath --version
     if ($LASTEXITCODE -ne 0 -or [int]($nodeVersion.TrimStart('v').Split('.')[0]) -lt 20) { throw 'Node.js 20 이상이 필요합니다.' }
+    & $nodePath (Join-Path $PSScriptRoot 'scripts/check-solver.mjs')
+    if ($LASTEXITCODE -ne 0) { throw 'Python 3.10 이상을 설치하고 timetable-demo 폴더에서 npm run setup:solver를 실행해 주세요.' }
 
     $chromeCandidates = @(
         "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",

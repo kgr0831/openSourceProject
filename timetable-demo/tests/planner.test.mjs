@@ -32,9 +32,9 @@ test('ICS는 한국 시간을 UTC로 변환하고 휴강을 제외하며 한글�
   assert.equal((output.match(/BEGIN:VEVENT/g)||[]).length,3);assert.match(output,/DTSTART:20261019T000000Z/);assert.match(output,/DTEND:20261019T013000Z/);assert.match(unfolded,/\\,시험\\;일정\\\\메모\\n새 줄/);
   assert.ok(output.endsWith('END:VCALENDAR\r\n'));for(const line of output.split('\r\n'))assert.ok(Buffer.byteLength(line)<=75);
 });
-test('진로 관심 과목은 실제 카탈로그 ID를 사용하며 이수 과목을 제외한다',()=>{
+test('진로 관심 과목은 실제 카탈로그 ID를 사용하며 이수 과목을 제외한다',async()=>{
   const preferred=careerSelection('vision',1,['ml'],courses);assert.deepEqual(preferred,['ds','math2']);
-  const result=generateCandidates({...structuredClone(defaultRequest),preferredCourseIds:preferred,excludedCourseIds:['ml']});assert.ok(result.candidates.length);assert.ok(result.candidates.every(c=>c.sections.every(s=>s.courseId!=='ml')));
+  const result=await generateCandidates({...structuredClone(defaultRequest),preferredCourseIds:preferred,excludedCourseIds:['ml']});assert.ok(result.candidates.length);assert.ok(result.candidates.every(c=>c.sections.every(s=>s.courseId!=='ml')));
   assert.throws(()=>careerSelection('fake',0,[],courses));
 });
 test('날짜·기간·시간 검증과 윤년 계산',()=>{
