@@ -1,0 +1,322 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "implementation_rulebase_not_executable_solver",
+  "written_on": "2026-11-01",
+  "engine": {
+    "required": "ortools-cp-sat",
+    "recommended_runtime": "python",
+    "node_adapter": "OrToolsCandidateProvider",
+    "silent_demo_fallback_allowed": false,
+    "required_operations": [
+      "recommend",
+      "recommendAlternatives",
+      "recommendWithRelaxation"
+    ],
+    "solver_version_policy": "record_actual_version_and_pin_after_validation",
+    "proof_configuration": {
+      "relative_gap_limit": 0.0,
+      "absolute_gap_limit": 0.0,
+      "acceptance_test_workers": 1,
+      "acceptance_test_seed": 42
+    },
+    "request_budget": "shared_across_strict_relaxation_lexicographic_and_top_k_phases"
+  },
+  "units": {
+    "day": "Monday=1..Sunday=7",
+    "time": "integer_minutes_since_midnight",
+    "interval": "half_open",
+    "credits": "exact_integer_scaling_then_restore",
+    "no_time_rounding": true
+  },
+  "constraints": [
+    {
+      "id": "H001",
+      "category": "protected",
+      "key": "no_time_overlap",
+      "cp_sat_binding": "conflict_pair_x_sum_at_most_one"
+    },
+    {
+      "id": "H002",
+      "category": "protected",
+      "key": "one_section_per_course",
+      "cp_sat_binding": "sum_sections_equals_boolean_course_selected"
+    },
+    {
+      "id": "H003",
+      "category": "user_constraint",
+      "key": "credit_range",
+      "cp_sat_binding": "scaled_integer_credit_bounds"
+    },
+    {
+      "id": "H004",
+      "category": "protected",
+      "key": "required_courses",
+      "cp_sat_binding": "required_course_selected_equals_one"
+    },
+    {
+      "id": "H005",
+      "category": "protected",
+      "key": "excluded_courses_and_sections",
+      "cp_sat_binding": "excluded_variables_equal_zero"
+    },
+    {
+      "id": "H006",
+      "category": "protected",
+      "key": "locked_sections",
+      "cp_sat_binding": "locked_section_selected_equals_one"
+    },
+    {
+      "id": "H007",
+      "category": "protected",
+      "key": "allowed_weekdays_and_term",
+      "cp_sat_binding": "outside_scope_sections_equal_zero"
+    },
+    {
+      "id": "H008",
+      "category": "user_constraint",
+      "key": "attendance_days",
+      "cp_sat_binding": "bidirectional_day_presence_and_exact_or_max"
+    },
+    {
+      "id": "H009",
+      "category": "user_constraint",
+      "key": "morning_limit",
+      "cp_sat_binding": "meeting_count_or_day_presence_bound"
+    },
+    {
+      "id": "H010",
+      "category": "user_constraint",
+      "key": "lunch_duration",
+      "cp_sat_binding": "continuous_lunch_witness_linked_to_selected_duration"
+    }
+  ],
+  "ranking_profiles": {
+    "compact": [
+      "total_gap_minutes",
+      "latest_end",
+      "max_daily_teaching_minutes",
+      "morning_meeting_count",
+      "canonical_section_id_list"
+    ],
+    "fewer_days": [
+      "attendance_days",
+      "total_gap_minutes",
+      "latest_end",
+      "canonical_section_id_list"
+    ],
+    "balanced": [
+      "max_daily_teaching_minutes",
+      "total_gap_minutes",
+      "latest_end",
+      "canonical_section_id_list"
+    ]
+  },
+  "relaxation": {
+    "automatic_enable_default": false,
+    "allowed_condition_keys": [
+      "attendance_days",
+      "morning_limit",
+      "credit_range",
+      "lunch_duration"
+    ],
+    "normal_mode_uses_original_values": true,
+    "missing_rule_or_allow_false": "keep_original",
+    "strict_stage_transition": "relax_only_after_proven_original_infeasible_and_explicit_policy",
+    "level_selection": "one_hot_including_original",
+    "change_count_unit": "condition_group",
+    "credit_min_max_grouped": true,
+    "objective_order": [
+      "changed_condition_count",
+      "sum_changed_importance",
+      "sum_normalized_change_units",
+      "active_ranking_profile"
+    ],
+    "level_change_cost": "exact_difference_divided_by_declared_step",
+    "max_changed_enforced": true,
+    "output_scope": "minimum_cost_only",
+    "original_request_mutation_allowed": false,
+    "preserve": [
+      "time_conflicts",
+      "unique_course_selection",
+      "required_courses",
+      "excluded_courses_and_sections",
+      "locked_sections",
+      "allowed_weekdays",
+      "term",
+      "morning_cutoff_and_unit",
+      "lunch_window_and_placement"
+    ]
+  },
+  "top_k": {
+    "identity": [
+      "term",
+      "sorted_section_ids"
+    ],
+    "exact_exclusion": "sum(1-x_s for s in S) + sum(x_s for s in U-S) >= 1",
+    "per_rank_preference_objectives_reoptimized": true,
+    "solution_witness_changes_are_new_timetables": false,
+    "previous_rank_temporary_objective_equalities_must_be_removed": true,
+    "minimum_relaxation_cost_scope_equalities_are_retained": true,
+    "total_count_requires_complete_unique_section_set_enumeration": true,
+    "return_fewer_if_exhausted": true
+  },
+  "alternatives": {
+    "exclude_failed_sections": true,
+    "preserve_locked_sections": true,
+    "same_course_set_default": true,
+    "preserve_credit_total_default": true,
+    "course_replacement_requires_explicit_permission": true,
+    "objective_order": [
+      "course_symmetric_difference_count",
+      "section_symmetric_difference_count",
+      "active_ranking_profile"
+    ],
+    "automatic_constraint_relaxation_default": false,
+    "combined_mode_if_explicitly_supported_order": [
+      "relaxation_objective_vector",
+      "alternative_objective_vector"
+    ]
+  },
+  "solver_status_semantics": {
+    "OPTIMAL": "interpret_for_this_model_and_objective_with_gap_settings",
+    "FEASIBLE": "valid_incumbent_objective_not_proven",
+    "INFEASIBLE": "no_solution_for_this_model_scope",
+    "UNKNOWN": "unresolved_not_infeasible",
+    "MODEL_INVALID": "model_error"
+  },
+  "required_result_metadata": [
+    "engine",
+    "engine_version",
+    "model_build_id",
+    "catalog_version_or_hash",
+    "normalized_request",
+    "original_constraints",
+    "effective_constraints",
+    "changes",
+    "phase_results",
+    "proven_objective_prefix",
+    "minimality_proven",
+    "ranking_proven",
+    "coverage",
+    "termination_reason",
+    "returned_unique_count",
+    "total_unique_count_or_null"
+  ],
+  "acceptance_check_ids": [
+    "ORT001",
+    "ORT002",
+    "ORT003",
+    "ORT004",
+    "ORT005",
+    "ORT006",
+    "ORT007",
+    "ORT008",
+    "ORT009",
+    "ORT010",
+    "ORT011",
+    "ORT012",
+    "ORT013",
+    "ORT014"
+  ],
+  "example_request": {
+    "term": "2026-2",
+    "grade": 3,
+    "constraints": {
+      "allowed_weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "attendance_days": {
+        "mode": "exact",
+        "value": 4
+      },
+      "credits": {
+        "min": 15,
+        "max": 21
+      },
+      "morning": {
+        "before_minute": 720,
+        "unit": "meeting",
+        "max": 2
+      },
+      "lunch": {
+        "enabled": true,
+        "window_start": 720,
+        "window_end": 840,
+        "duration": 60,
+        "placement": "within_window"
+      },
+      "required_course_ids": [],
+      "excluded_course_ids": [],
+      "excluded_section_ids": [],
+      "locked_section_ids": []
+    },
+    "ranking": {
+      "mode": "lexicographic",
+      "profile": "compact"
+    },
+    "selection": {
+      "mode": "by_credit",
+      "credit_targets": [
+        15,
+        18,
+        21
+      ],
+      "k": 3
+    }
+  },
+  "example_relaxation_policy": {
+    "max_changed": 2,
+    "rules": {
+      "attendance_days": {
+        "allow": true,
+        "importance": 8,
+        "step": 1,
+        "allowed_values": [
+          4,
+          5
+        ]
+      },
+      "morning_limit": {
+        "allow": true,
+        "importance": 2,
+        "step": 1,
+        "allowed_values": [
+          2,
+          3,
+          4
+        ]
+      },
+      "credit_range": {
+        "allow": false,
+        "importance": 10,
+        "step": 3,
+        "allowed_values": [
+          {
+            "min": 15,
+            "max": 21
+          }
+        ]
+      },
+      "lunch_duration": {
+        "allow": true,
+        "importance": 6,
+        "step": 15,
+        "allowed_values": [
+          60,
+          45
+        ]
+      }
+    }
+  },
+  "example_policy_is_not_user_authorization": true,
+  "references": [
+    "https://developers.google.com/optimization/cp/cp_solver/",
+    "https://developers.google.com/optimization/install",
+    "https://github.com/google/or-tools/blob/stable/ortools/sat/docs/troubleshooting.md",
+    "https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto"
+  ]
+}

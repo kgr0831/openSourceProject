@@ -20,6 +20,8 @@ try {
 
     & $nodePath (Join-Path $PSScriptRoot 'prepare-lms.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'LMS 구성 요소를 준비하지 못했습니다. 위의 안내를 확인해 주세요.' }
+    & $nodePath (Join-Path $PSScriptRoot 'scripts/check-solver.mjs')
+    if ($LASTEXITCODE -ne 0) { throw 'Python 3.10 이상을 설치하고 timetable-demo 폴더에서 npm run setup:solver를 실행해 주세요.' }
 
     $chromeCandidates = @(
         "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
@@ -56,12 +58,7 @@ try {
     }
     if (-not $ready) { throw '서버 준비 시간이 초과됐습니다. 다시 실행해 주세요.' }
 
-    Write-Host 'Codex 연결을 확인하고 있습니다.'
-    try {
-        $status = Invoke-RestMethod -Uri "$localUrl/api/status" -TimeoutSec 30
-        if ($status.connected) { Write-Host 'Codex 연결 완료.' -ForegroundColor Green }
-        else { Write-Host '앱에서 Codex 연결 버튼을 눌러 로그인해 주세요.' }
-    } catch { Write-Host 'Codex 연결은 앱에서 다시 확인해 주세요.' -ForegroundColor Yellow }
+    Write-Host '기본 추천은 바로 사용할 수 있습니다. AI 추천은 앱에서 연결해 주세요.'
     if ($demoJob.Wait(0)) { throw '서버가 종료됐습니다. 다시 실행해 주세요.' }
 
     # Chrome is started outside the server's job, preserving other browser windows.

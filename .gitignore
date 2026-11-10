@@ -16,3 +16,6 @@ playwright/.auth/
 storage-state*.json
 login.dpapi
 login-*.tmp
+.venv/
+__pycache__/
+*.pyc
