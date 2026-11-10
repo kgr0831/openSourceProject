@@ -9,10 +9,29 @@
   <link rel="icon" href="/assets/figma/start-imgGrid.svg" type="image/svg+xml">
   <link rel="preload" href="/assets/noto-sans-kr-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/lms.css">
 </head>
 <body>
   <a class="skip-link" href="#content">본문으로 이동</a>
   <div id="app"><main class="boot" role="status">시간표를 준비하고 있어요.</main></div>
+  <div id="lms-panel-host" hidden>
+<details id="lms-panel" class="lms-panel" open>
+<summary><span><strong>내 LMS 일정</strong><span class="subtle">수강 중인 과목의 과제·시험·강의 마감을 가져와요.</span></span><span id="lms-badge" class="badge neutral">연결 확인 중</span></summary>
+<div class="lms-panel-body">
+<div class="lms-connect-row"><div><h2 id="lms-connection-title">학교 연결 확인 중</h2><p id="lms-connection-description" class="subtle">이 프로젝트에 저장된 학교 로그인을 확인하고 있어요.</p></div><div class="lms-actions"><button id="lms-connect" type="button" class="button primary" disabled>숭실대 LMS 연결</button><button id="lms-disconnect" type="button" class="button quiet" hidden>학교 로그아웃</button></div></div>
+<div id="lms-login-help" class="lms-actions" hidden><button id="lms-focus" type="button" class="button secondary">학교 로그인 창 보기</button><button id="lms-confirm" type="button" class="button secondary">로그인 완료했어요</button></div>
+<p id="lms-message" class="message" role="status" aria-live="polite" hidden></p>
+<div id="lms-course-picker" hidden>
+<div class="lms-course-tools"><label>가져올 과목<input id="lms-search" type="search" placeholder="과목명 검색"></label><label>학기<select id="lms-term"><option value="">모든 학기</option></select></label><span id="lms-selection-count" class="subtle">0개 선택</span><button id="lms-select-visible" type="button" class="button quiet">보이는 과목 선택</button><button id="lms-clear" type="button" class="button quiet">선택 해제</button></div>
+<div id="lms-courses" class="lms-courses"></div><p id="lms-no-courses" class="subtle" hidden>검색한 과목이 없어요.</p>
+<div class="lms-sync-row"><p class="field-note">선택한 과목만 가져와요. 다시 가져오면 변경된 마감이 갱신됩니다.</p><button id="lms-sync" type="button" class="button primary" disabled>선택한 과목 일정 가져오기</button><button id="lms-cancel" type="button" class="button secondary" hidden>가져오기 중단</button></div>
+</div>
+<div id="lms-progress" class="lms-progress" role="status" hidden><strong id="lms-progress-label">일정을 가져오고 있어요.</strong><progress id="lms-progress-bar" max="1" value="0" aria-label="일정 가져오기 진행률"></progress><p class="field-note">학교 창을 계속 열어 둘 필요는 없어요. 수집은 백그라운드에서 진행됩니다.</p></div>
+<div id="lms-result" class="lms-result" hidden><div><strong id="lms-result-title"></strong><p id="lms-result-detail" class="subtle"></p></div><button id="lms-show-calendar" type="button" class="button secondary">가져온 일정 보기</button></div>
+<p id="lms-warnings" class="field-note" hidden></p>
+<p class="privacy-note">로그인은 이 Windows 계정으로 암호화해 보관해요. 학교 계정별 일정은 이 브라우저에 저장됩니다. 자료·동영상 다운로드는 별도 ‘LMS 모아’ 프로그램에서 사용할 수 있어요.</p>
+</div></details>
+  </div>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <dialog id="dialog" aria-labelledby="dialog-title"></dialog>
   <noscript>시간표를 사용하려면 브라우저의 JavaScript를 켜 주세요.</noscript>
