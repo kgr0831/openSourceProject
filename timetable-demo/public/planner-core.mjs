@@ -1,3 +1,5 @@
+import {validateLmsEvent} from './lms-calendar.mjs';
+
 export const careerTracks = [
   {id:'vision',name:'AI · 컴퓨터비전',description:'수학과 프로그래밍 기초부터 영상 이해까지 살펴보는 예시예요.',stages:[['기초',['prog1','aimath','stats']],['핵심',['ds','ml','math2']],['심화',['deep','vision','drive']]]},
   {id:'data',name:'데이터 분석',description:'데이터를 저장하고 분석하는 과목을 단계별로 살펴봐요.',stages:[['기초',['prog1','stats','aimath']],['핵심',['db','science','ml']],['심화',['bigdata','deep','nlp']]]},
@@ -25,6 +27,7 @@ export function timeText(minutes){return String(Math.floor(minutes/60)).padStart
 export function timeValue(value){if(typeof value!=='string'||!/^\d{2}:\d{2}$/.test(value))return NaN;const [h,m]=value.split(':').map(Number);return h<24&&m<60?h*60+m:NaN}
 export function validatePeriod(start,end){const length=daysBetween(start,end);if(length<0||length>216)throw new Error('학기 기간은 시작일부터 최대 31주까지 설정해 주세요.');return {start,end}}
 export function validateEvent(event) {
+  if(event?.source==='lms')return validateLmsEvent(event);
   if(!event||typeof event!=='object'||typeof event.id!=='string'||!event.id||event.id.length>200)throw new Error('일정 정보를 확인해 주세요.');
   parseDate(event.date);
   if(typeof event.title!=='string'||!event.title.trim()||event.title.length>100)throw new Error('일정 이름을 100자 이내로 입력해 주세요.');
@@ -69,7 +72,7 @@ export function editEvents(events,id,patch,{scope='one',action='edit',period}={}
   return updated;
 }
 export function conflictPairs(events) {
-  const active=events.filter(event=>event.status==='active').sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start),pairs=[];
+  const active=events.filter(event=>event.status==='active'&&!event.point&&!event.allDay).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start),pairs=[];
   for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length&&active[j].date===active[i].date;j++) {
     if(active[j].start>=active[i].end)break;
     if(active[i].start<active[j].end)pairs.push([active[i].id,active[j].id]);
@@ -94,6 +97,17 @@ export function exportCalendar(events,now=new Date()) {
   const stamp=now.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');
   for(const event of events) {
     validateEvent(event);if(event.status==='cancelled')continue;
+    if(event.source==='lms'){
+      lines.push('BEGIN:VEVENT','UID:'+encodeURIComponent(event.id)+'@ssu-timetable.local','DTSTAMP:'+stamp);
+      if(event.allDay)lines.push('DTSTART;VALUE=DATE:'+event.date.replace(/-/g,''),'DTEND;VALUE=DATE:'+event.endDate.replace(/-/g,''));
+      else{
+        const format=value=>new Date(value).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');
+        lines.push('DTSTART:'+format(event.startAt));if(event.endAt)lines.push('DTEND:'+format(event.endAt));
+      }
+      lines.push('SUMMARY:'+escapeIcs(event.title),'LOCATION:'+escapeIcs(event.location),'DESCRIPTION:'+escapeIcs(event.lmsKind==='deadline'?'LMS 마감 기한':'LMS 일정'));
+      if(event.sourceUrl)lines.push('URL:'+escapeIcs(event.sourceUrl));
+      lines.push('END:VEVENT');continue;
+    }
     lines.push('BEGIN:VEVENT','UID:'+encodeURIComponent(event.id)+'@ssu-timetable.local','DTSTAMP:'+stamp,'DTSTART:'+utcStamp(event.date,event.start),'DTEND:'+utcStamp(event.date,event.end),'SUMMARY:'+escapeIcs(event.title),'LOCATION:'+escapeIcs(event.location),'DESCRIPTION:'+escapeIcs(kindLabels[event.kind]+' · 시간표 데모에서 내보낸 일정'),'END:VEVENT');
   }
   lines.push('END:VCALENDAR');return lines.map(foldIcs).join('\r\n')+'\r\n';

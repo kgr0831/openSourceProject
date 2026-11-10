@@ -1,4 +1,5 @@
 import {setupPlanner} from './planner.js';
+import {setupLms} from './lms.js';
 const $=id=>document.getElementById(id),dayNames=['월','화','수','목','금'];
 let planner;
 const preferenceLabels={fewDays:'등교일 줄이기',late:'오전 수업 피하기',friday:'금요일 공강 선호',compact:'수업 사이 빈 시간 줄이기',travel:'건물 이동 줄이기'};
@@ -149,5 +150,6 @@ try{
     if(state.busy)throw new Error('AI 추천이 끝난 뒤 과목을 적용해 주세요.');
     const r=request();r.preferredCourseIds=preferred;r.requiredCourseIds=r.requiredCourseIds.filter(id=>!completed.includes(id));r.excludedCourseIds=[...new Set([...r.excludedCourseIds,...completed])].filter(id=>!preferred.includes(id));applyRequest(r);await refreshCandidates();
   }});
+  setupLms(planner);
   applyRequest(meta.defaultRequest);await Promise.all([refreshCandidates(),refreshStatus()]);
 }catch(error){message(error.message)}

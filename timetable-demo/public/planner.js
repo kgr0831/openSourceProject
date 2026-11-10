@@ -1,4 +1,5 @@
 import {careerTracks,experienceExamples,kindLabels,careerSelection,createSemesterEvents,editEvents,conflictPairs,exportCalendar,emptyPlanner,restorePlanner,validateEvent,parseDate,addDays,weekStart,koreanToday,timeText,timeValue} from './planner-core.mjs';
+import {occursOnDate,agendaEvents,lmsTimeLabel,lmsKindLabel} from './lms-calendar.mjs';
 
 const $=id=>document.getElementById(id),storageKey='ssu-timetable-planner-v1';
 const dayNames=['일','월','화','수','목','금','토'];
@@ -8,15 +9,18 @@ function notice(text,error=false){$('planner-message').textContent=text;$('plann
 function dateLabel(date){const d=parseDate(date);return `${d.getUTCMonth()+1}/${d.getUTCDate()} (${dayNames[d.getUTCDay()]})`}
 
 export function setupPlanner({courses,getCandidate,applyCourses}) {
-  let data=emptyPlanner(),selectedDate=koreanToday(),editingId=null;
+  let data=emptyPlanner(),selectedDate=koreanToday(),editingId=null,lmsCalendar=null;
+  const allEvents=()=>[...data.events,...(lmsCalendar?.events||[])];
   const completed=new Set(),known=new Map(courses.map(course=>[course.id,course]));
   try{const saved=localStorage.getItem(storageKey);if(saved)data=restorePlanner(JSON.parse(saved))}catch{notice('저장된 기록을 불러오지 못했어요. 기존 브라우저 데이터는 그대로 두었습니다.',true)}
   function showView(name){
+    if(!['recommend','calendar','experience'].includes(name))return;
     for(const id of ['recommend','calendar','experience'])$(id+'-view').hidden=id!==name;
     document.querySelectorAll('.view-nav [data-view]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.view===name)));
     if(name==='calendar')renderCalendar();if(name==='experience')renderExperiences();
   }
   for(const el of document.querySelectorAll('[data-view]'))el.addEventListener('click',()=>showView(el.dataset.view));
+  window.addEventListener('hashchange',()=>showView(location.hash.slice(1)));
   function save(next){
     restorePlanner(next);
     try{localStorage.setItem(storageKey,JSON.stringify(next))}catch{throw new Error('브라우저에 저장하지 못했어요. 저장 공간과 브라우저 설정을 확인해 주세요.')}
@@ -58,23 +62,26 @@ export function setupPlanner({courses,getCandidate,applyCourses}) {
     notice(`수업 일정 ${events.length}개를 저장했어요. 날짜를 골라 휴강·시험·장소 변경을 반영해 보세요.`);
   }));
   function renderCalendar(){
-    $('calendar-empty').hidden=!!data.semester;$('calendar-content').hidden=!data.semester;$('export-calendar').disabled=!data.semester;
-    if(!data.semester)return;
-    $('semester-label').textContent=`${data.semester.start} – ${data.semester.end} · 전공 ${data.semester.candidate.majorCredits} + 교양 ${data.semester.candidate.generalCredits}학점`;
-    const active=data.events.filter(e=>e.status==='active'),nextExam=active.filter(e=>e.kind==='exam'&&e.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start)[0];
-    const highlights=[['오늘의 일정',active.filter(e=>e.date===today).length+'개'],['다가오는 시험',nextExam?dateLabel(nextExam.date)+' '+nextExam.title:'등록된 시험 없음'],['변경·휴강',data.events.filter(e=>e.original&&(e.status==='cancelled'||['date','start','end','location','kind','title'].some(k=>e[k]!==e.original[k]))).length+'개']];
+    const events=allEvents(),hasCalendar=!!data.semester||events.length>0;
+    $('calendar-empty').hidden=hasCalendar;$('calendar-content').hidden=!hasCalendar;$('export-calendar').disabled=!events.length;
+    $('add-event').disabled=!data.semester;$('add-event').title=data.semester?'':'추천 시간표를 저장하면 개인 일정도 추가할 수 있어요.';
+    $('semester-label').textContent=data.semester?`${data.semester.start} – ${data.semester.end} · 전공 ${data.semester.candidate.majorCredits} + 교양 ${data.semester.candidate.generalCredits}학점`:'LMS를 연결하면 실제 과제·시험·강의 마감을 볼 수 있어요.';
+    if(lmsCalendar)$('semester-label').textContent+=` · LMS ${lmsCalendar.events.length}개`;
+    if(!hasCalendar)return;
+    const active=events.filter(e=>e.status==='active'),nextExam=active.filter(e=>(e.kind==='exam'||e.source==='lms'&&e.lmsKind==='deadline')&&e.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start)[0];
+    const highlights=[['오늘의 일정',active.filter(e=>occursOnDate(e,today)).length+'개'],['다가오는 시험·마감',nextExam?dateLabel(nextExam.date)+' '+nextExam.title:'등록된 시험·마감 없음'],['변경·휴강',data.events.filter(e=>e.original&&(e.status==='cancelled'||['date','start','end','location','kind','title'].some(k=>e[k]!==e.original[k]))).length+'개']];
     $('calendar-highlights').replaceChildren(...highlights.map(([title,value])=>{const card=node('div');card.append(node('span',title),node('strong',value));return card}));
     const month=$('calendar-month').value||selectedDate.slice(0,7),first=month+'-01',offset=(parseDate(first).getUTCDay()+6)%7,last=new Date(parseDate(first));last.setUTCMonth(last.getUTCMonth()+1);last.setUTCDate(0);
     $('month-grid').replaceChildren();
     for(let i=0;i<offset;i++)$('month-grid').append(node('span','','month-spacer'));
     for(let day=1;day<=last.getUTCDate();day++){
-      const date=month+'-'+String(day).padStart(2,'0'),items=data.events.filter(e=>e.date===date&&e.status==='active');
+      const date=month+'-'+String(day).padStart(2,'0'),items=events.filter(e=>occursOnDate(e,date)&&e.status==='active');
       const cell=button(String(day),()=>{selectedDate=date;renderCalendar()},'month-day'+(date===selectedDate?' selected':'')+(date===today?' today':''));
       cell.setAttribute('aria-label',date+' 일정 '+items.length+'개');cell.setAttribute('aria-pressed',String(date===selectedDate));
       const dots=node('span','','month-dots');if(items.some(e=>e.kind==='class'))dots.append(node('i','','class-dot'));if(items.some(e=>e.kind!=='class'))dots.append(node('i','','extra-dot'));cell.append(dots);$('month-grid').append(cell);
     }
     const from=weekStart(selectedDate),to=addDays(from,6);$('week-label').textContent=dateLabel(from)+' – '+dateLabel(to);
-    const week=data.events.filter(e=>e.date>=from&&e.date<=to).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start||a.id.localeCompare(b.id));
+    const week=agendaEvents(events,from,to);
     const conflicts=new Set(conflictPairs(week).flat());$('week-agenda').replaceChildren();
     for(let n=0;n<7;n++){
       const date=addDays(from,n),items=week.filter(e=>e.date===date),group=node('section','','agenda-day'+(date===selectedDate?' selected':''));
@@ -83,8 +90,8 @@ export function setupPlanner({courses,getCandidate,applyCourses}) {
       for(const event of items){
         const cancelled=event.status==='cancelled',changed=event.original&&['date','start','end','location','kind','title'].some(k=>event[k]!==event.original[k]);
         const row=button('',()=>openEditor(event.id),'agenda-event'+(cancelled?' cancelled':'')+(conflicts.has(event.id)?' conflict':''));
-        row.append(node('span',timeText(event.start)+'–'+timeText(event.end),'agenda-time'));
-        const info=node('span','','agenda-info');info.append(node('strong',event.title),node('small',(event.location||'장소 미정')+(changed?' · 변경됨':'')));row.append(info,node('span',cancelled?'휴강·취소':kindLabels[event.kind],'event-kind '+event.kind));
+        row.append(node('span',event.source==='lms'?lmsTimeLabel(event):timeText(event.start)+'–'+timeText(event.end),'agenda-time'));
+        const info=node('span','','agenda-info');info.append(node('strong',event.title),node('small',(event.source==='lms'?'LMS · 눌러서 원문 확인':event.location||'장소 미정')+(changed?' · 변경됨':'')));row.append(info,node('span',cancelled?'휴강·취소':event.source==='lms'?lmsKindLabel(event):kindLabels[event.kind],'event-kind '+event.kind));
         if(conflicts.has(event.id))row.append(node('span','시간 겹침','conflict-label'));group.append(row);
       }
       $('week-agenda').append(group);
@@ -94,6 +101,15 @@ export function setupPlanner({courses,getCandidate,applyCourses}) {
   $('calendar-month').addEventListener('change',()=>{if($('calendar-month').value)selectDate($('calendar-month').value+'-01')});
   $('previous-week').addEventListener('click',()=>selectDate(addDays(selectedDate,-7)));$('next-week').addEventListener('click',()=>selectDate(addDays(selectedDate,7)));$('calendar-today').addEventListener('click',()=>selectDate(today));
   function openEditor(id=null){
+    const imported=lmsCalendar?.events.find(event=>event.id===id);
+    if(imported){
+      $('lms-event-title').textContent=imported.title;
+      const lastDate=imported.allDay?addDays(imported.endDate,-1):imported.endDate;
+      $('lms-event-detail').textContent=`${dateLabel(imported.date)}${lastDate!==imported.date?' – '+dateLabel(lastDate):''} · ${lmsTimeLabel(imported)} · ${lmsKindLabel(imported)}`;
+      $('lms-event-source').hidden=!imported.sourceUrl;
+      if(imported.sourceUrl)$('lms-event-source').href=imported.sourceUrl;else $('lms-event-source').removeAttribute('href');
+      $('lms-event-dialog').showModal();return;
+    }
     if(!data.semester){notice('시간표를 먼저 학기 캘린더에 저장해 주세요.',true);return}
     editingId=id;const event=data.events.find(e=>e.id===id),series=!!event?.seriesId;
     $('event-dialog-title').textContent=event?'일정 변경':'일정 추가';$('event-error').hidden=true;
@@ -108,6 +124,7 @@ export function setupPlanner({courses,getCandidate,applyCourses}) {
     $('event-dialog').showModal();
   }
   $('add-event').addEventListener('click',()=>openEditor());$('close-event').addEventListener('click',()=>$('event-dialog').close());
+  $('close-lms-event').addEventListener('click',()=>$('lms-event-dialog').close());
   function submitEvent(action='edit'){
     try{
       const patch={title:$('event-title').value.trim(),date:$('event-date').value,start:timeValue($('event-start').value),end:timeValue($('event-end').value),location:$('event-location').value.trim(),kind:$('event-kind').value};
@@ -127,7 +144,7 @@ export function setupPlanner({courses,getCandidate,applyCourses}) {
   }
   $('event-form').addEventListener('submit',event=>{event.preventDefault();submitEvent()});$('cancel-event').addEventListener('click',()=>submitEvent('cancel'));$('restore-event').addEventListener('click',()=>submitEvent('restore'));
   $('export-calendar').addEventListener('click',guard(()=>{
-    const text=exportCalendar(data.events),url=URL.createObjectURL(new Blob([text],{type:'text/calendar;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='숭실대_학기일정.ics';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+    const text=exportCalendar(allEvents()),url=URL.createObjectURL(new Blob([text],{type:'text/calendar;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='숭실대_학기일정.ics';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
     notice('캘린더 파일을 내려받았어요. 사용하는 캘린더의 가져오기로 열어 주세요. 변경 후에는 다시 내보내야 하며, 반복 가져오기는 일정이 중복될 수 있어요.');
   }));
   function renderExperiences(){
@@ -151,6 +168,11 @@ export function setupPlanner({courses,getCandidate,applyCourses}) {
       save({...data,experiences:[...data.experiences,{id:crypto.randomUUID(),title,body,courseNames:candidate.sections.map(s=>s.name)}]});$('experience-form').reset();notice('현재 시간표와 조언을 내 브라우저에 저장했어요.');
     }catch(error){notice(error.message,true)}
   });
-  renderCalendar();renderExperiences();
-  return {selectionChanged(candidate){$('experience-selection').textContent=candidate?'기록할 시간표: '+candidate.credits+'학점 · '+candidate.sections.map(s=>s.name).join(' · '):'추천 시간표를 먼저 선택해 주세요.'}};
+  renderCalendar();renderExperiences();showView(location.hash.slice(1)||'recommend');
+  return {setLmsCalendar(value){lmsCalendar=value;renderCalendar()},
+    showLmsCalendar(){
+      const dates=(lmsCalendar?.events||[]).map(event=>event.date).sort();
+      selectDate(dates.find(date=>date>=today)||dates.at(-1)||today);showView('calendar');
+      $('calendar-content').scrollIntoView({block:'start'});
+    },selectionChanged(candidate){$('experience-selection').textContent=candidate?'기록할 시간표: '+candidate.credits+'학점 · '+candidate.sections.map(s=>s.name).join(' · '):'추천 시간표를 먼저 선택해 주세요.'}};
 }

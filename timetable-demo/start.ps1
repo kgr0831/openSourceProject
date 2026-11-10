@@ -14,9 +14,12 @@ try {
     $nodeCommand = Get-Command node.exe -ErrorAction SilentlyContinue
     if ($nodeCommand) { $nodeCandidates += $nodeCommand.Source }
     $nodePath = $nodeCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
-    if (-not $nodePath) { throw 'Node.js 20 이상이 필요합니다.' }
+    if (-not $nodePath) { throw 'Node.js 20.18.1 이상이 필요합니다.' }
     $nodeVersion = & $nodePath --version
-    if ($LASTEXITCODE -ne 0 -or [int]($nodeVersion.TrimStart('v').Split('.')[0]) -lt 20) { throw 'Node.js 20 이상이 필요합니다.' }
+    if ($LASTEXITCODE -ne 0 -or [version]$nodeVersion.TrimStart('v') -lt [version]'20.18.1') { throw 'Node.js 20.18.1 이상이 필요합니다.' }
+
+    & $nodePath (Join-Path $PSScriptRoot 'prepare-lms.mjs')
+    if ($LASTEXITCODE -ne 0) { throw 'LMS 구성 요소를 준비하지 못했습니다. 위의 안내를 확인해 주세요.' }
 
     $chromeCandidates = @(
         "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",

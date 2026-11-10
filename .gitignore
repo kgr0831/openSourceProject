@@ -8,3 +8,11 @@ coverage/
 auth.json
 .DS_Store
 Thumbs.db
+lms-output/
+lms-parser/output/
+lms-parser/.ui-qa/
+timetable-demo/.ui-qa/
+playwright/.auth/
+storage-state*.json
+login.dpapi
+login-*.tmp
