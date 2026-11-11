@@ -88,3 +88,83 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
   assert.equal(await page.locator('#lms-result').isVisible(),false);assert.equal(await page.locator('#lms-courses input:checked').count(),0);
   assert.deepEqual(failures,[]);
 });
+
+test('브라우저에서 휴강, 충돌 확인, 보강 연결, 분반 변경 미리보기와 개인 일정 보존을 확인한다',{timeout:45000},async t=>{
+  const server=createTimetableServer({port:0,bridge:{close(){}},createLms:async()=>({
+    resume(){},view:()=>({connected:false}),async close(){}
+  })});
+  await new Promise((resolve,reject)=>server.once('error',reject).listen(0,'127.0.0.1',resolve));
+  t.after(async()=>{await server.closeServices();await new Promise(resolve=>server.close(resolve))});
+  const browser=await chromium.launch({channel:'chrome',headless:true});
+  t.after(()=>browser.close());
+  const page=await browser.newPage({viewport:{width:1360,height:1050},reducedMotion:'reduce'});
+  const errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  const base='http://127.0.0.1:'+server.address().port;
+  const module=await page.request.get(base+'/calendar-logic.mjs');
+  assert.equal(module.status(),200);
+  assert.match(module.headers()['content-type'],/text\/javascript/);
+  const original={id:'db-01',courseId:'db',name:'데이터베이스',building:'정보관',credits:3,meetings:[[0,540,630]]};
+  const replacement={...original,id:'db-02',meetings:[[1,540,630]]};
+  const candidates=[original,replacement].map((section,i)=>({id:section.id,sections:[section],credits:3,
+    strategy:'추천 '+(i+1),metrics:{days:1,dayList:[i],gapMinutes:0}}));
+  await page.route('**/api/candidates',route=>route.fulfill({json:{request:route.request().postDataJSON(),candidates}}));
+  const saved=()=>page.evaluate(()=>localStorage.getItem('ssu-timetable-planner-v1'));
+  const route=async id=>{
+    await page.evaluate(id=>location.hash=id,id);
+    await page.locator('main[data-route="'+id+'"]').waitFor();
+  };
+  const action=name=>page.locator('[data-action="'+name+'"]:visible').first();
+  const input=name=>page.locator('#event-form [name="'+name+'"]');
+  await page.goto(base+'/#preferences');
+  await action('recommend').click();
+  await page.locator('main[data-route="results"]').waitFor();
+  assert.equal(await saved(),null);
+  await action('confirm').click();
+  await page.locator('#semester-form [name="start"]').fill('2026-10-19');
+  await page.locator('#semester-form [name="end"]').fill('2026-11-08');
+  await page.locator('#semester-form button[type="submit"]').click();
+  await page.locator('main[data-route="saved"]').waitFor();
+  const originalId=JSON.parse(await saved()).events[0].id;
+  await route('calendar');
+  await page.locator('#calendar-date').fill('2026-10-19');
+  await page.locator('.agenda-item[data-id="'+originalId+'"]').click();
+  await action('cancel-event').click();
+  await page.locator('.agenda-item.cancelled[data-id="'+originalId+'"]').waitFor();
+
+  await action('add-event').click();
+  await input('title').fill('개인 약속');
+  await action('save-event').click();
+  await page.locator('.agenda-item').filter({hasText:'개인 약속'}).waitFor();
+  await action('add-event').click();
+  await input('kind').selectOption('makeup');
+  await input('originalEventId').selectOption(originalId);
+  await input('title').fill('수업 보강');
+  await action('save-event').click();
+  await page.locator('#dialog').getByText(/개인 약속 \/ 수업 보강|수업 보강 \/ 개인 약속/).waitFor();
+  await action('apply-calendar').click();
+  await page.locator('.agenda-item').filter({hasText:'수업 보강'}).waitFor();
+
+  const before=await saved();
+  await route('results');
+  await page.locator('.comparison-card[data-value="1"]').click();
+  assert.equal(await saved(),before);
+  await action('confirm').click();
+  await page.locator('#semester-form [name="effectiveDate"]').fill('2026-10-19');
+  await page.locator('#semester-form button[type="submit"]').click();
+  const reviews=page.locator('#calendar-review select');
+  await reviews.first().waitFor();
+  assert.equal(await reviews.count(),2);
+  assert.equal(await saved(),before);
+  for(const select of await reviews.all())await select.selectOption('keep');
+  await page.locator('#calendar-review button[type="submit"]').click();
+  assert.equal(await saved(),before);
+  await action('apply-calendar').click();
+  await page.locator('main[data-route="saved"]').waitFor();
+  const result=JSON.parse(await saved());
+  assert.equal(result.semester.candidate.sections[0].id,'db-02');
+  assert.equal(result.events.find(event=>event.id===originalId).status,'cancelled');
+  assert.equal(result.events.find(event=>event.kind==='makeup').originalEventId,originalId);
+  assert.equal(result.events.find(event=>event.kind==='personal').title,'개인 약속');
+  assert.deepEqual(errors,[]);
+});

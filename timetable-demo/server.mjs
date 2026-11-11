@@ -22,6 +22,7 @@ const files={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','
 files['/ui.js']=['ui.js','text/javascript; charset=utf-8'];
 files['/design-assets.js']=['design-assets.js','text/javascript; charset=utf-8'];
 files['/solver-ui.js']=['solver-ui.js','text/javascript; charset=utf-8'];
+files['/calendar-logic.mjs']=['calendar-logic.mjs','text/javascript; charset=utf-8'];
 files['/lms.css']=['lms.css','text/css; charset=utf-8'];
 export function createTimetableServer({port=4317,bridge=new CodexBridge(),createLms=async()=>new (await import('./lms-service.mjs')).LmsCalendarService()}={}) {
 let recommendationBusy=false,lmsPromise=null,lms=null;

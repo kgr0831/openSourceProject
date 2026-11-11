@@ -1,8 +1,9 @@
 import {hardConditions,updateHardCondition,relaxationDialog,relaxationPolicy,changesNotice} from './solver-ui.js';
 import {createPlannerStore} from './planner.js';
+import {calendarEvents} from './calendar-logic.mjs';
 import {setupLms} from './lms.js';
 import {occursOnDate,agendaEvents,lmsTimeLabel,lmsKindLabel} from './lms-calendar.mjs';
-import {careerTracks,careerSelection,kindLabels,createSemesterEvents,editEvents,validateEvent,conflictPairs,exportCalendar,parseDate,addDays,weekStart,koreanToday,timeText,timeValue} from './planner-core.mjs';
+import {careerTracks,careerSelection,kindLabels,conflictPairs,exportCalendar,parseDate,addDays,weekStart,koreanToday,timeText,timeValue} from './planner-core.mjs';
 import {esc,icon,button,link,heading,info,field,toggle,tabs,footer,timetable,layoutTimetables,layoutTabs,animateElements,dayNames,longestDay} from './ui.js';
 
 const $=id=>document.getElementById(id);
@@ -13,9 +14,9 @@ const state={
   eventDraft:null,eventReturn:'calendar',error:'',diagnostics:[],busy:false,controller:null,
   source:'rules',aiStatus:null,aiMessage:'',noteTitle:'',noteBody:'',lastMode:'rules',resultRequest:null,interpretation:null,lmsCalendar:null
 };
-let toastTimer,pollTimer,requestVersion=0,lmsReady=false;
-const allEvents=()=>[...store.data.events,...(state.lmsCalendar?.events||[])];
-function withLmsEvents(events){return [...events,...[...new Set(events.map(event=>event.date))].flatMap(date=>agendaEvents(state.lmsCalendar?.events||[],date,date))]}
+let toastTimer,pollTimer,requestVersion=0,lmsReady=false,pendingCalendar=null;
+const allEvents=()=>[...calendarEvents(store.data.events),...(state.lmsCalendar?.events||[])];
+const calendarOptions=()=>({externalEvents:state.lmsCalendar?.events||[]});
 const titles={start:'캠퍼스 시간표',courses:'과목 고르기',preferences:'생활 패턴 정하기',advanced:'세부 선호',results:'추천 시간표',saved:'내 시간표',career:'진로에서 과목 찾기',calendar:'학기 일정',event:'일정 변경',export:'캘린더 내보내기',experience:'수강 경험',record:'나의 수강 기록',empty:'추천 결과',loading:'시간표 찾는 중',error:'연결 확인',ai:'AI에게 요청하기'};
 const designScreen={results:'resultA'};
 function current(){return state.options[state.active]}
@@ -122,7 +123,7 @@ function resultsView(){
 function savedView(){
   const c=store.data.semester?.candidate;
   if(!c)return body(heading('아직 시간표가 없어요.','내 생활 패턴에 맞는 첫 시간표를 만들어 보세요.'))+footer(link('시간표 만들기','courses','primary'));
-  const today=koreanToday(),next=store.data.events.filter(e=>e.status==='active'&&e.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start)[0];
+  const today=koreanToday(),next=calendarEvents(store.data.events).filter(e=>e.status==='active'&&e.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start)[0];
   const first=c.sections[0];
   return body('<div class="desktop-heading heading-row">'+heading('이번 주도, 내 리듬대로.',semesterLabel()+' · 내 시간표')+link('추천안 다시 비교',state.options.length?'results':'preferences','secondary')+'</div>'+
     '<div class="mobile-only table-tools"><span class="chip">'+semesterLabel()+'</span><span class="muted">'+c.credits+'학점</span></div>'+
@@ -153,15 +154,22 @@ function calendarView(){
 function eventView(){
   const d=state.eventDraft;if(!d)return body(heading('일정을 먼저 선택해 주세요.'))+footer(link('학기 일정 보기','calendar','primary'));
   const original=store.data.events.find(e=>e.id===state.editing),cancelled=original?.status==='cancelled';
+  const kinds=original?(original.kind==='class'&&original.seriesId&&!original.retired&&!d.replacedBy?['class','exam']:[original.kind]):['personal','exam','makeup'];
+  const courseOptions=store.data.semester.candidate.sections.map(s=>'<option value="'+esc(s.courseId)+'">'+esc(s.name)+'</option>').join('');
+  const makeupOptions=store.data.events.filter(e=>e.seriesId&&e.status==='cancelled').map(e=>
+    '<option value="'+esc(e.id)+'">'+esc(e.title)+' · '+e.date+' '+timeText(e.start)+'</option>').join('');
   return body(heading(original?'일정을 조정해요':'새 일정을 더해요',original?'변경된 내용은 학기 일정에 반영돼요.':'시험, 보강, 개인 약속도 함께 관리해요.')+
     '<form id="event-form" class="stack">'+field('일정 이름','<input name="title" required maxlength="100" value="'+esc(d.title)+'">')+
-    field('종류','<select name="kind">'+Object.entries(kindLabels).map(([key,label])=>'<option value="'+key+'" '+(key===d.kind?'selected':'')+'>'+label+'</option>').join('')+'</select>')+
+    field('종류','<select name="kind">'+kinds.map(key=>'<option value="'+key+'" '+(key===d.kind?'selected':'')+'>'+(original&&key==='exam'&&d.kind==='class'?'이 수업을 대체하는 시험':kindLabels[key])+'</option>').join('')+'</select>')+
+    (!original?'<div id="event-course" hidden>'+field('관련 과목','<select name="courseId"><option value="">과목 선택</option>'+courseOptions+'</select>')+'</div>'+
+      '<div id="makeup-original" hidden>'+field('보강할 휴강 수업','<select name="originalEventId"><option value="">연결 없이 추가</option>'+makeupOptions+'</select>')+'</div>':'')+
     field('날짜','<input name="date" type="date" required min="'+store.data.semester.start+'" max="'+store.data.semester.end+'" value="'+d.date+'">')+
     '<div class="two-fields">'+field('시작','<input name="start" type="time" required value="'+timeText(d.start)+'">')+field('종료','<input name="end" type="time" required value="'+timeText(d.end)+'">')+'</div>'+
     field('장소','<input name="location" maxlength="100" placeholder="강의실 또는 약속 장소" value="'+esc(d.location)+'">')+
-    (original?.seriesId?'<fieldset class="scope-picker"><legend>변경 범위</legend><label><input type="radio" name="scope" value="one" checked>이번 일정만</label><label><input type="radio" name="scope" value="future">이후 같은 반복 수업도</label><small>같은 분반의 같은 요일 수업에 적용돼요.</small></fieldset>':'')+
-    '<p id="event-error" class="form-error" role="alert"></p></form>'+ (cancelled?info('휴강·취소된 일정이에요','복원하면 학기 일정에 다시 포함돼요.'):'')+
-    (original?'<div class="inline-actions">'+(cancelled?button('일정 복원','restore-event','secondary'):button('휴강 · 일정 취소','cancel-event','danger'))+(original.original&&!cancelled?button('원래 수업으로 복원','restore-event','quiet'):'')+'</div>':''))+
+    (original?.seriesId&&!original.retired?'<fieldset class="scope-picker"><legend>변경 범위</legend><label><input type="radio" name="scope" value="one" checked>이번 일정만</label><label><input type="radio" name="scope" value="future">이후 같은 반복 수업도</label><small>같은 분반의 같은 요일 수업에 적용돼요.</small></fieldset>':'')+
+    '<p id="event-error" class="form-error" role="alert"></p></form>'+ (cancelled?info('휴강·취소된 일정이에요',original.retired?'이 분반의 정규 일정은 종료되었어요.':'복원하면 학기 일정에 다시 포함돼요.'):'')+
+    (d.replacedBy?info('대체 시험이 연결된 수업이에요','시험을 취소하면 별도 휴강 처리하지 않은 수업이 다시 표시돼요.'):'')+
+    (original?'<div class="inline-actions">'+(cancelled?(original.retired?'':button('일정 복원','resume-event','secondary')):button('휴강 · 일정 취소','cancel-event','danger'))+(original.seriesId?button('원래 수업 정보로 복원','restore-event','quiet'):'')+'</div>':''))+
     footer(button('변경 저장하기','save-event','primary',cancelled?'disabled':''));
 }
 function exportView(){
@@ -249,12 +257,15 @@ async function recommend(mode='rules',payload){
   }catch(e){if(version!==requestVersion)return;state.busy=false;state.error=e.name==='AbortError'?'응답이 오래 걸리고 있어요. 잠시 뒤 다시 시도해 주세요.':e.message;go('error')}
   finally{clearTimeout(timeout)}
 }
-function dialog(content){delete $('dialog').dataset.lmsAccount;$('dialog').innerHTML=content;$('dialog').showModal()}
-function closeDialog(){$('dialog').close()}
+function dialog(content){const modal=$('dialog');delete modal.dataset.lmsAccount;modal.innerHTML=content;if(!modal.open)modal.showModal()}
+function closeDialog(){pendingCalendar=null;$('dialog').close()}
 function confirmSemester(){
-  const today=koreanToday(),year=today.slice(0,4),second=Number(today.slice(5,7))>=7;
-  const start=store.data.semester?.start||year+(second?'-09-01':'-03-02'),end=store.data.semester?.end||year+(second?'-12-20':'-06-20');
-  dialog(changesNotice(current())+'<div class="dialog-heading"><h2 id="dialog-title">이번 학기 시간표로 저장</h2>'+button('×','close-dialog','icon-button','aria-label="닫기"')+'</div><p>학기 기간을 정하면 수업 일정을 함께 만들어요.</p><form id="semester-form" class="stack">'+field('학기 시작일','<input name="start" type="date" required value="'+start+'">')+field('학기 종료일','<input name="end" type="date" required value="'+end+'">')+(store.data.semester?'<label class="replace-confirm"><input name="replace" type="checkbox" required>기존 학기 일정과 변경 내역을 새 시간표로 교체합니다. 수강 기록은 유지돼요.</label>':'')+'<p id="semester-error" class="form-error" role="alert"></p><button type="submit" class="button primary">내 시간표로 저장</button></form>');
+  const today=koreanToday(),year=today.slice(0,4),second=Number(today.slice(5,7))>=7,semester=store.data.semester;
+  const start=semester?.start||year+(second?'-09-01':'-03-02'),end=semester?.end||year+(second?'-12-20':'-06-20');
+  const min=semester?.effectiveDate||start,effective=today<min?min:today>end?end:today;
+  const dates=semester?field('새 시간표 적용 시작일','<input name="effectiveDate" type="date" required min="'+min+'" max="'+end+'" value="'+effective+'">'):
+    field('학기 시작일','<input name="start" type="date" required value="'+start+'">')+field('학기 종료일','<input name="end" type="date" required value="'+end+'">');
+  dialog(changesNotice(current())+'<div class="dialog-heading"><h2 id="dialog-title">이번 학기 시간표로 저장</h2>'+button('×','close-dialog','icon-button','aria-label="닫기"')+'</div><form id="semester-form" class="stack">'+dates+'<p id="semester-error" class="form-error" role="alert"></p><button type="submit" class="button primary">'+(semester?'시간표 변경 미리보기':'내 시간표로 저장')+'</button></form>');
 }
 function showSection(courseId){
   const c=state.route==='saved'?store.data.semester?.candidate:current(),s=c?.sections.find(s=>s.courseId===courseId);if(!s)return;
@@ -270,18 +281,47 @@ function openEvent(id){
   state.editing=id;state.eventDraft={...e};state.eventReturn=state.route==='saved'?'saved':'calendar';go('event');
 }
 function addEvent(){if(!store.data.semester){go('courses');return}state.editing=null;state.eventDraft={title:'',date:state.selectedDate,start:720,end:780,location:'',kind:'personal'};state.eventReturn='calendar';go('event')}
-function eventPatch(){const f=$('event-form'),data=new FormData(f);return {title:String(data.get('title')).trim(),date:String(data.get('date')),start:timeValue(data.get('start')),end:timeValue(data.get('end')),location:String(data.get('location')).trim(),kind:String(data.get('kind'))}}
-function saveEvent(action='edit',confirmed=false){
-  const f=$('event-form');if(action==='edit'&&!f.reportValidity())return;
+function commitCalendar(preview,done,acceptConflicts=false){
+  store.apply(preview,{...calendarOptions(),acceptConflicts});
+  closeDialog();done(preview);
+}
+function submitCalendar(command,done,confirm=false){
+  const preview=store.preview(command,calendarOptions());
+  if(!preview.ok)throw new Error(preview.errors[0].message);
+  if(!confirm&&!preview.requiresReview&&!preview.conflicts.length&&!preview.preserved.length){commitCalendar(preview,done);return}
+  pendingCalendar={preview,done};
+  const counts={add:0,update:0,cancel:0};
+  for(const change of preview.changes)if(Object.hasOwn(counts,change.type))counts[change.type]++;
+  const conflicts=preview.conflicts.length?'<ul>'+preview.conflicts.map(c=>'<li>'+esc(c.events.map(e=>e.title).join(' / '))+' · '+c.date+' '+timeText(c.start)+'–'+timeText(c.end)+'</li>').join('')+'</ul>':'';
+  const review=preview.requiresReview?'<form id="calendar-review" class="stack">'+preview.review.map(item=>field(
+    esc(item.event.title)+' · '+item.event.date,
+    '<select name="'+esc(item.id)+'" required><option value="">처리 방법 선택</option>'+item.options.map(option=>'<option value="'+option+'">'+(option==='keep'?'기존 연결과 상태 유지':'취소 상태로 보존')+'</option>').join('')+'</select>'
+  )).join('')+'<button class="button primary" type="submit">선택 반영해 다시 보기</button></form>':
+    button(preview.conflicts.length?'겹침을 확인하고 저장':'변경 확인하고 저장','apply-calendar');
+  dialog('<div class="dialog-heading"><h2 id="dialog-title">일정 변경 미리보기</h2>'+button('×','close-dialog','icon-button','aria-label="닫기"')+'</div>'+
+    '<p>추가 '+counts.add+'개 · 수정 '+counts.update+'개 · 취소 '+counts.cancel+'개 · 예외 및 개인 일정 유지 '+preview.preserved.length+'개</p>'+
+    (conflicts?'<p>시간이 겹치는 일정</p>'+conflicts:'')+review+'<p id="calendar-preview-error" class="form-error" role="alert"></p>');
+}
+function saveEvent(action='edit'){
+  const form=$('event-form');if(action==='edit'&&!form.reportValidity())return;
   try{
-    const patch=action==='edit'?eventPatch():{},scope=new FormData(f).get('scope')||'one';
-    const preview=state.editing?editEvents(store.data.events,state.editing,patch,{action,scope,period:store.data.semester}):[...store.data.events,validateEvent({...patch,id:'preview-new-event',status:'active'})];
-    if(!state.editing&&(patch.date<store.data.semester.start||patch.date>store.data.semester.end))throw new Error('학기 기간 안의 날짜를 선택해 주세요.');
-    const before=new Set(conflictPairs(withLmsEvents(store.data.events)).map(p=>p.slice().sort().join('|'))),newConflicts=conflictPairs(withLmsEvents(preview)).filter(p=>!before.has(p.slice().sort().join('|')));
-    if(newConflicts.length&&!confirmed){dialog('<div class="dialog-heading"><h2 id="dialog-title">겹치는 일정이 있어요</h2>'+button('×','close-dialog','icon-button','aria-label="닫기"')+'</div><p>변경 후 '+newConflicts.length+'개의 일정 겹침이 생겨요. 그래도 저장할까요?</p><div class="stack">'+button('겹침을 확인하고 저장','accept-conflict','primary','data-value="'+action+'"')+button('다시 수정하기','close-dialog','secondary')+'</div>');return}
-    if(state.editing)store.changeEvent(state.editing,patch,{action,scope});else store.addEvent(patch);
-    state.selectedDate=(action==='restore'?preview.find(e=>e.id===state.editing)?.date:patch.date)||state.eventDraft.date;
-    closeDialog();go('calendar');flash(action==='cancel'?'일정을 취소했어요.':action==='restore'?'일정을 복원했어요.':'일정을 저장했어요.');
+    const data=new FormData(form),scope=data.get('scope')||'one',draft=state.eventDraft;
+    const fields={title:String(data.get('title')).trim(),date:String(data.get('date')),start:timeValue(data.get('start')),
+      end:timeValue(data.get('end')),location:String(data.get('location')).trim(),kind:String(data.get('kind'))};
+    const replacement=state.editing&&action==='edit'&&draft.kind==='class'&&fields.kind==='exam';
+    if(replacement&&scope==='future')throw new Error('대체 시험은 이번 일정만 선택해 등록해 주세요.');
+    const patch=action==='edit'?Object.fromEntries(Object.entries(fields).filter(([key,value])=>draft[key]!==value)):{};
+    const command=state.editing&&!replacement?{type:'edit',id:state.editing,action,scope,patch}:{type:'add',event:fields};
+    if(command.type==='add'&&fields.kind!=='personal'){
+      const originalEventId=replacement?state.editing:fields.kind==='makeup'?data.get('originalEventId'):null;
+      if(originalEventId)command.originalEventId=originalEventId;
+      if(data.get('courseId'))command.courseId=data.get('courseId');
+      if(fields.kind==='exam')command.examMode=replacement?'replacement':'additional';
+    }
+    submitCalendar(command,preview=>{
+      state.selectedDate=preview.changes.find(change=>change.type==='add'||change.id===state.editing)?.after?.date||draft.date;
+      go('calendar');flash(action==='cancel'?'일정을 취소했어요.':['restore','resume'].includes(action)?'일정을 복원했어요.':'일정을 저장했어요.');
+    });
   }catch(e){$('event-error').textContent=e.message}
 }
 async function checkConnection(){
@@ -328,7 +368,13 @@ async function act(action,el){
     case 'save-event':saveEvent();break;
     case 'cancel-event':saveEvent('cancel');break;
     case 'restore-event':saveEvent('restore');break;
-    case 'accept-conflict':saveEvent(el.dataset.value,true);break;
+    case 'resume-event':saveEvent('resume');break;
+    case 'apply-calendar':{
+      if(!pendingCalendar)break;
+      try{commitCalendar(pendingCalendar.preview,pendingCalendar.done,true)}
+      catch(error){$('calendar-preview-error').textContent=error.message}
+      break;
+    }
     case 'download':{const url=URL.createObjectURL(new Blob([exportCalendar(allEvents())],{type:'text/calendar;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='campus-'+(store.data.semester?.start||koreanToday())+'.ics';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);flash('캘린더 파일을 다운로드했어요.');break}
     case 'save-record':{if(!$('record-form').reportValidity())return;try{store.addRecord(state.noteTitle,state.noteBody,store.data.semester?.candidate||current());state.noteTitle='';state.noteBody='';go('experience');flash('내 기록을 저장했어요.')}catch(e){$('record-error').textContent=e.message}break}
     case 'connect':{el.disabled=true;try{const status=await api('status');if(!status.connected)await api('connect',{});await checkConnection()}finally{el.disabled=false}break}
@@ -356,12 +402,30 @@ document.addEventListener('change',e=>{
   if(el.dataset.exclude){const id=el.dataset.exclude;r.excludedCourseIds=el.checked?[...new Set([...r.excludedCourseIds,id])]:r.excludedCourseIds.filter(x=>x!==id);if(el.checked)r.requiredCourseIds=r.requiredCourseIds.filter(x=>x!==id);$('course-list').innerHTML=courseList();$('selection-summary').textContent=selectionSummary()}
   if(el.dataset.completed){if(el.checked)state.completed.add(el.dataset.completed);else state.completed.delete(el.dataset.completed);state.careerPicked=null;const open=el.closest('details')?.open;render();if(open)document.querySelector('details').open=true}
   if(el.id==='calendar-date'&&el.value){state.selectedDate=el.value;render()}
+  if(el.name==='kind'&&el.form?.id==='event-form'&&$('event-course')){
+    $('event-course').hidden=el.value==='personal';
+    $('makeup-original').hidden=el.value!=='makeup';
+  }
 });
 document.addEventListener('submit',e=>{
   e.preventDefault();if(e.target.id==='relax-form'){
     try{const request=structuredClone(state.request);request.relaxationPolicy=relaxationPolicy(request,e.target);closeDialog();recommend('relax',request)}catch(error){$('relax-error').textContent=error.message}
   }else if(e.target.id==='semester-form'){
-    try{const f=new FormData(e.target);store.setSemester(current(),String(f.get('start')),String(f.get('end')));const today=koreanToday();state.selectedDate=today>=f.get('start')&&today<=f.get('end')?today:String(f.get('start'));closeDialog();go('saved');flash('시간표와 학기 일정을 저장했어요.')}catch(error){$('semester-error').textContent=error.message}
+    try{
+      const f=new FormData(e.target),candidate=current(),effectiveDate=f.get('effectiveDate');
+      const command=effectiveDate?{type:'replace',candidate,effectiveDate}:{type:'initialize',candidate,start:f.get('start'),end:f.get('end')};
+      submitCalendar(command,()=>{
+        const {start,end}=store.data.semester,today=koreanToday();
+        state.selectedDate=effectiveDate||(today>=start&&today<=end?today:start);
+        go('saved');flash('시간표와 학기 일정을 저장했어요.');
+      },Boolean(effectiveDate));
+    }catch(error){$('semester-error').textContent=error.message}
+  }else if(e.target.id==='calendar-review'&&pendingCalendar){
+    try{
+      const {preview,done}=pendingCalendar,decisions=Object.fromEntries(new FormData(e.target));
+      if(preview.revision!==store.data.revision)throw new Error('다른 변경이 저장되었어요. 미리보기를 다시 확인해 주세요.');
+      submitCalendar({...preview.command,decisions},done,true);
+    }catch(error){$('calendar-preview-error').textContent=error.message}
   }else if(e.target.id==='event-form')saveEvent();else if(e.target.id==='record-form')act('save-record',e.target);
 });
 window.addEventListener('hashchange',()=>{if(state.request)routeChanged()});
