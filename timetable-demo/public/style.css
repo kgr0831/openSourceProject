@@ -2152,3 +2152,54 @@ dialog[open]::backdrop { animation:backdrop-enter .2s ease-out; }
   .screen:not(.wide) .screen-body>* { flex-shrink:0; }
   .screen:not(.wide) .action-footer,.screen:not(.wide) .bottom-nav { flex-shrink:0; }
 }
+
+/* Career exploration shares the page gutters and action sizing of the planner. */
+.home-primary-actions { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; width:100%; }
+.home-primary-actions .button { min-width:0; min-height:52px; padding:12px; }
+.welcome-action>.quiet { align-self:flex-start; padding-left:0; color:var(--brand); }
+.screen[data-route=start] .action-footer>.quiet { align-self:center; min-height:36px; padding:6px 12px; }
+.career-columns { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:24px; align-items:stretch; }
+.career-columns>.card { min-width:0; margin:0; padding:24px; border-radius:20px; }
+.career-columns>.card>h2 { padding-bottom:16px; margin:0; border-bottom:1px solid var(--line); font-size:18px; }
+.career-columns .stack { gap:0; }
+.career-columns .course-card { min-width:0; width:100%; align-items:flex-start; margin:0; }
+.career-columns article.course-card { padding:20px 0; border:0; border-bottom:1px solid var(--line); border-radius:0; box-shadow:none; background:transparent; }
+.career-columns article.course-card:last-child { border-bottom:0; padding-bottom:0; }
+.career-columns .course-card>div,.career-columns .course-card>span:first-child { min-width:0; }
+.career-columns strong,.career-columns p,.career-columns small { overflow-wrap:anywhere; }
+.career-columns .course-card strong { display:block; font-size:16px; line-height:1.6; word-break:keep-all; }
+.career-columns .course-card small { display:block; margin-top:6px; }
+.career-columns .course-card p { margin:10px 0 0; line-height:1.75; color:var(--muted); font-size:13px; }
+.career-list-actions { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; align-items:stretch; }
+.career-list-actions .button { min-width:0; }
+.career-list-body { gap:24px; }
+/* The compact selection panel uses the same alignment without nested padding. */
+.disclosure .career-columns { gap:12px; margin-top:20px; }
+.disclosure .career-columns>.card { padding:12px; }
+.disclosure .career-columns>.card>h2 { font-size:15px; padding-bottom:12px; }
+.disclosure .career-columns .stack { gap:10px; padding-top:12px; }
+.disclosure .career-columns button.course-card { padding:12px; flex-wrap:wrap; gap:8px; }
+.disclosure .career-columns .course-card strong { font-size:13px; }
+.disclosure .career-columns .course-card p { font-size:12px; }
+@media(min-width:600px) and (max-width:999px) {
+  .screen[data-route="career-list"] { width:calc(100% - 48px); max-width:960px; }
+}
+@media(min-width:1000px) {
+  .screen[data-route="career-list"] { width:100%; max-width:none; }
+  .career-list-body { max-width:1120px; width:100%; margin:0 auto; padding:40px; gap:28px; }
+  .career-list-actions { display:flex; justify-content:flex-end; }
+  .career-list-actions .button { width:auto; min-width:190px; }
+  .welcome-action { max-width:420px; width:100%; gap:10px; }
+  .welcome-action p { text-align:left; }
+}
+@media(max-width:599px) {
+  .career-columns { gap:12px; }
+  .career-columns>.card { padding:14px 12px; border-radius:16px; }
+  .career-columns>.card>h2 { font-size:16px; padding-bottom:12px; }
+  .career-columns .course-card strong { font-size:14px; }
+  .career-columns article.course-card { padding:16px 0; }
+  .career-columns .course-card p { font-size:12px; line-height:1.7; }
+  .career-list-actions { gap:10px; }
+  .career-list-actions .button,.home-primary-actions .button { font-size:13px; padding:12px 8px; }
+  .home-primary-actions .button-arrow { display:none; }
+}
