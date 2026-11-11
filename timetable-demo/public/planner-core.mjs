@@ -1,3 +1,4 @@
+import {validateCareerList} from './career-model.mjs';
 import {validateLmsEvent} from './lms-calendar.mjs';
 
 export const careerTracks = [
@@ -114,6 +115,7 @@ export function exportCalendar(events,now=new Date()) {
 }
 export function emptyPlanner(){return {version:1,semester:null,events:[],experiences:[]}}
 export function restorePlanner(value) {
+  if(value?.careerRecommendations!==undefined)validateCareerList(value.careerRecommendations);
   if(!value||value.version!==1||!Array.isArray(value.events)||value.events.length>2000||!Array.isArray(value.experiences)||value.experiences.length>50)throw new Error('저장된 학기 기록을 읽지 못했어요.');
   if(value.semester){validatePeriod(value.semester.start,value.semester.end);if(!value.semester.candidate?.sections?.length)throw new Error('저장된 시간표가 올바르지 않아요.')}
   else if(value.events.length)throw new Error('학기 없는 일정은 불러올 수 없어요.');

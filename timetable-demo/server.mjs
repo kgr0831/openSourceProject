@@ -1,3 +1,4 @@
+import {evaluateCareer} from './career.mjs';
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -21,6 +22,7 @@ async function readJson(req){
 const files={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/planner.js':['planner.js','text/javascript; charset=utf-8'],'/planner-core.mjs':['planner-core.mjs','text/javascript; charset=utf-8'],'/lms.js':['lms.js','text/javascript; charset=utf-8'],'/lms-calendar.mjs':['lms-calendar.mjs','text/javascript; charset=utf-8']};
 files['/ui.js']=['ui.js','text/javascript; charset=utf-8'];
 files['/design-assets.js']=['design-assets.js','text/javascript; charset=utf-8'];
+files['/career-model.mjs']=['career-model.mjs','text/javascript; charset=utf-8'];
 files['/solver-ui.js']=['solver-ui.js','text/javascript; charset=utf-8'];
 files['/lms.css']=['lms.css','text/css; charset=utf-8'];
 export function createTimetableServer({port=4317,bridge=new CodexBridge(),createLms=async()=>new (await import('./lms-service.mjs')).LmsCalendarService()}={}) {
@@ -62,6 +64,11 @@ const server=http.createServer(async(req,res)=>{
       catch(error){return reply(res,400,{error:friendlyError(error)})}
     }
     if(recommendationBusy&&['/api/connect','/api/cancel'].includes(url.pathname))throw new Error('추천이 끝난 뒤 계정을 변경해 주세요.');
+    if(url.pathname==='/api/career'){
+      if(recommendationBusy||bridge.busy)throw new Error('추천을 생성 중입니다. 잠시 기다려 주세요.');
+      recommendationBusy=true;
+      try{return reply(res,200,await evaluateCareer(body,bridge))}finally{recommendationBusy=false}
+    }
     if(url.pathname==='/api/connect')return reply(res,200,await bridge.connect());
     if(url.pathname==='/api/cancel')return reply(res,200,await bridge.cancelLogin());
     if(['/api/candidates','/api/relax','/api/alternatives'].includes(url.pathname)){

@@ -1,3 +1,4 @@
+import {validateCareerList} from './career-model.mjs';
 import {emptyPlanner,restorePlanner,createSemesterEvents,editEvents,validateEvent} from './planner-core.mjs';
 
 export const storageKey='ssu-timetable-planner-v1';
@@ -19,6 +20,10 @@ export function createPlannerStore(storage) {
     setSemester(candidate,start,end){
       const events=createSemesterEvents(candidate,start,end);
       save({...data,semester:{start,end,candidate:structuredClone(candidate)},events});
+    },
+    saveCareerList(list){
+      validateCareerList(list);
+      save({...data,careerRecommendations:structuredClone(list)});
     },
     changeEvent(id,patch,options){save({...data,events:editEvents(data.events,id,patch,{...options,period:data.semester})})},
     addEvent(patch){
