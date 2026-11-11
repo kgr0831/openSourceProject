@@ -1,29 +1,31 @@
 import {hardConditions,updateHardCondition,relaxationDialog,relaxationPolicy,changesNotice} from './solver-ui.js';
 import {createPlannerStore} from './planner.js';
 import {calendarEvents} from './calendar-logic.mjs';
+import {calendarDateLabel,calendarPeriodLabel,calendarViews,eventKindLabel,koreanDate,stepCalendarDate,toCalendarEvents} from './calendar-display.mjs';
+import {calendarHeight,highlightCalendarDate,mountCalendar} from './calendar-view.js';
 import {setupLms} from './lms.js';
-import {occursOnDate,agendaEvents,lmsTimeLabel,lmsKindLabel} from './lms-calendar.mjs';
-import {careerTracks,careerSelection,kindLabels,conflictPairs,exportCalendar,parseDate,addDays,weekStart,koreanToday,timeText,timeValue} from './planner-core.mjs';
+import {lmsTimeLabel} from './lms-calendar.mjs';
+import {careerTracks,careerSelection,kindLabels,exportCalendar,addDays,koreanToday,timeText,timeValue} from './planner-core.mjs';
 import {esc,icon,button,link,heading,info,field,toggle,tabs,footer,timetable,layoutTimetables,layoutTabs,animateElements,dayNames,longestDay} from './ui.js';
 
 const $=id=>document.getElementById(id);
 const store=createPlannerStore({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)});
 const state={
   courses:[],request:null,options:[],active:0,query:'',kind:'major',showAll:false,route:'start',
-  track:'data',stage:1,completed:new Set(),careerPicked:null,selectedDate:koreanToday(),editing:null,
-  eventDraft:null,eventReturn:'calendar',error:'',diagnostics:[],busy:false,controller:null,
+  track:'data',stage:1,completed:new Set(),careerPicked:null,selectedDate:koreanToday(),selectedMinute:null,
+  calendarMode:'week',showCalendarClasses:true,eventOriginal:null,eventDraft:null,error:'',diagnostics:[],busy:false,controller:null,
   source:'rules',aiStatus:null,aiMessage:'',noteTitle:'',noteBody:'',lastMode:'rules',resultRequest:null,interpretation:null,lmsCalendar:null
 };
-let toastTimer,pollTimer,requestVersion=0,lmsReady=false,pendingCalendar=null;
+let toastTimer,pollTimer,requestVersion=0,lmsReady=false,pendingCalendar=null,calendarWidget=null;
 const allEvents=()=>[...calendarEvents(store.data.events),...(state.lmsCalendar?.events||[])];
 const calendarOptions=()=>({externalEvents:state.lmsCalendar?.events||[]});
-const titles={start:'캠퍼스 시간표',courses:'과목 고르기',preferences:'생활 패턴 정하기',advanced:'세부 선호',results:'추천 시간표',saved:'내 시간표',career:'진로에서 과목 찾기',calendar:'학기 일정',event:'일정 변경',export:'캘린더 내보내기',experience:'수강 경험',record:'나의 수강 기록',empty:'추천 결과',loading:'시간표 찾는 중',error:'연결 확인',ai:'AI에게 요청하기'};
+const titles={start:'캠퍼스 시간표',courses:'과목 고르기',preferences:'생활 패턴 정하기',advanced:'세부 선호',results:'추천 시간표',saved:'내 시간표',career:'진로에서 과목 찾기',calendar:'학기 일정',export:'캘린더 내보내기',experience:'수강 경험',record:'나의 수강 기록',empty:'추천 결과',loading:'시간표 찾는 중',error:'연결 확인',ai:'AI에게 요청하기'};
 const designScreen={results:'resultA'};
 function current(){return state.options[state.active]}
 function semesterLabel(){const start=store.data.semester?.start||koreanToday();return start.slice(0,4)+'년 '+(Number(start.slice(5,7))<=6?'1':'2')+'학기'}
 function flash(text,error=false){clearTimeout(toastTimer);$('toast').textContent=text;$('toast').className='toast'+(error?' error':'');$('toast').hidden=false;toastTimer=setTimeout(()=>$('toast').hidden=true,5500)}
 function go(route){if(location.hash==='#'+route){state.route=route;render()}else location.hash=route}
-function back(){go(({courses:'start',preferences:'courses',advanced:'preferences',results:'preferences',career:'courses',calendar:'saved',experience:'career',record:'experience',export:'calendar',event:state.eventReturn,ai:'preferences',empty:'preferences',loading:'preferences',error:'preferences'})[state.route]||'saved')}
+function back(){go(({courses:'start',preferences:'courses',advanced:'preferences',results:'preferences',career:'courses',calendar:'saved',experience:'career',record:'experience',export:'calendar',ai:'preferences',empty:'preferences',loading:'preferences',error:'preferences'})[state.route]||'saved')}
 async function api(route,body,signal){
   const r=await fetch('/api/'+route,{...(body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-Timetable-App':'1'},body:JSON.stringify(body)}),signal:signal||AbortSignal.timeout(20000)});
   const data=await r.json();if(!r.ok)throw new Error(data.error||'잠시 뒤 다시 시도해 주세요.');return data;
@@ -130,11 +132,10 @@ function savedView(){
     '<div class="mobile-only">'+info('내 시간표로 저장했어요','수업을 누르면 상세 내용을 볼 수 있어요.',icon('saved','imgCheck'),true)+'</div>'+
     '<div class="saved-layout"><div class="schedule-main"><div class="table-tools desktop-only"><h2>나의 시간표</h2><span class="chip">'+c.credits+'학점 · '+c.sections.length+'과목</span></div><div class="timetable-surface">'+timetable(c)+'</div>'+
     '<small class="desktop-only">수업을 선택해 시간과 장소를 확인하세요.</small></div>'+
-    '<aside class="saved-side"><p class="muted">'+(next?dateLabel(next.date):'이번 학기')+'</p><button class="card next-class" data-action="'+(next?'open-event':'section')+'" data-id="'+esc(next?.id||first.courseId)+'">'+icon('saved','imgClock')+'<span><strong>'+(next?timeText(next.start)+'　'+esc(next.title):esc(first.name))+'</strong><small>'+(next?esc(next.location)+' · '+timeText(next.end)+' 종료':'수업 정보를 확인해 보세요.')+'</small></span></button>'+
+    '<aside class="saved-side"><p class="muted">'+(next?calendarDateLabel(next.date):'이번 학기')+'</p><button class="card next-class" data-action="'+(next?'open-event':'section')+'" data-id="'+esc(next?.id||first.courseId)+'">'+icon('saved','imgClock')+'<span><strong>'+(next?timeText(next.start)+'　'+esc(next.title):esc(first.name))+'</strong><small>'+(next?esc(next.location)+' · '+timeText(next.end)+' 종료':'수업 정보를 확인해 보세요.')+'</small></span></button>'+
     '<div class="desktop-only card info"><div><strong>나만의 한 학기</strong><p>주간표는 반복되는 수업을,<br>학기 일정은 날짜별 변경을 보여줘요.</p>'+link('학기 일정 보기','calendar')+'</div></div></aside></div>','wide-body')+bottomNav('saved');
 }
 
-function dateLabel(date){return new Intl.DateTimeFormat('ko-KR',{month:'long',day:'numeric',weekday:'short',timeZone:'UTC'}).format(parseDate(date))}
 function careerIds(){return state.careerPicked??careerSelection(state.track,state.stage,[...state.completed],state.courses)}
 function careerView(){
   const track=careerTracks.find(t=>t.id===state.track),ids=careerIds();
@@ -144,33 +145,92 @@ function careerView(){
     '<details class="disclosure"><summary>이미 들은 과목이 있어요</summary><div class="exclude-list">'+state.courses.filter(c=>c.kind==='major').map(c=>'<label><input type="checkbox" data-completed="'+c.id+'" '+(state.completed.has(c.id)?'checked':'')+'>'+esc(c.name)+'</label>').join('')+'</div></details><small>교육과정을 참고한 탐색 예시예요. 선수 과목과 개설 여부는 학교에서 확인해 주세요.</small>')+
     footer(button(ids.length+'과목을 관심 과목에 담기','apply-career','primary',ids.length?'':'disabled'),'필수 과목과 시간 조건 안에서 우선 추천해요');
 }
-function calendarView(){
-  const date=state.selectedDate,start=weekStart(date),all=allEvents(),events=agendaEvents(all,date,date),conflicts=new Set(conflictPairs(events).flat());
-  const label=semesterLabel()+(state.lmsCalendar?' · LMS '+state.lmsCalendar.events.length+'개':'');
-  return body('<div class="heading-row">'+heading('한눈에 보는 한 주',label)+link('내보내기','export','quiet')+'</div><div id="lms-slot"></div><div class="calendar-tools">'+button('‹','week','icon-button','data-value="-7" aria-label="이전 주"')+'<label class="date-jump"><span class="sr-only">날짜 선택</span><input type="date" id="calendar-date" value="'+date+'"></label>'+button('›','week','icon-button','data-value="7" aria-label="다음 주"')+button('오늘','today','quiet')+'</div>'+
-    '<div class="week-picker" role="group" aria-label="이번 주 날짜">'+Array.from({length:7},(_,i)=>{const d=addDays(start,i);return button('<small>'+['월','화','수','목','금','토','일'][i]+'</small><strong>'+Number(d.slice(8))+'</strong>'+(all.some(e=>occursOnDate(e,d)&&e.status==='active')?'<span class="dot"></span>':'<span class="dot blank"></span>'),'date','date-button '+(d===date?'selected':''),'data-value="'+d+'" aria-pressed="'+(d===date)+'"')}).join('')+'</div>'+
-    '<div class="section-title"><h2>'+dateLabel(date)+'</h2>'+button('+ 일정','add-event','quiet',store.data.semester?'':'disabled title="시간표를 저장하면 개인 일정도 추가할 수 있어요."')+'</div><div class="agenda">'+(events.length?events.map(e=>'<button class="agenda-item '+(e.source==='lms'?'lms-event ':'')+(e.status==='cancelled'?'cancelled':'')+'" data-action="open-event" data-id="'+esc(e.id)+'"><span class="agenda-time">'+(e.source==='lms'?esc(lmsTimeLabel(e)):timeText(e.start)+'<small>'+timeText(e.end)+'</small>')+'</span><span class="agenda-detail '+(e.kind==='class'?'blue':e.kind==='exam'?'peach':'sage')+'"><span class="eyebrow">'+(e.status==='cancelled'?'휴강 · 취소':e.source==='lms'?esc(lmsKindLabel(e)):kindLabels[e.kind])+(conflicts.has(e.id)?' · 시간 겹침':'')+'</span><strong>'+esc(e.title)+'</strong><small>'+esc(e.source==='lms'?'LMS · 눌러서 원문 확인':e.location||'장소 미정')+'</small></span></button>').join(''):'<div class="empty-agenda">'+icon('calendar','imgCalendar')+'<h3>등록된 일정이 없어요</h3><p>LMS 일정을 가져오거나 시간표를 저장해 보세요.</p></div>')+'</div>','calendar-body')+bottomNav('calendar');
+const calendarModes={week:'주간',month:'월간',day:'일간 목록'};
+function canAddEvent(date){
+  const semester=store.data.semester;
+  return Boolean(semester&&date>=semester.start&&date<=semester.end);
 }
-function eventView(){
-  const d=state.eventDraft;if(!d)return body(heading('일정을 먼저 선택해 주세요.'))+footer(link('학기 일정 보기','calendar','primary'));
-  const original=store.data.events.find(e=>e.id===state.editing),cancelled=original?.status==='cancelled';
-  const kinds=original?(original.kind==='class'&&original.seriesId&&!original.retired&&!d.replacedBy?['class','exam']:[original.kind]):['personal','exam','makeup'];
-  const courseOptions=store.data.semester.candidate.sections.map(s=>'<option value="'+esc(s.courseId)+'">'+esc(s.name)+'</option>').join('');
+function calendarView(){
+  const label=semesterLabel()+(state.lmsCalendar?' · LMS '+state.lmsCalendar.events.length+'개':'');
+  return body('<div class="heading-row">'+heading('학기 캘린더',label)+link('내보내기','export','quiet')+'</div>'+
+    '<section class="calendar-surface" aria-label="학기 일정 보기">'+
+    '<div class="calendar-toolbar"><div class="calendar-mode" role="group" aria-label="캘린더 보기">'+
+    Object.entries(calendarModes).map(([mode,label])=>button(label,'calendar-mode','quiet','data-value="'+mode+'" aria-pressed="'+(mode===state.calendarMode)+'"')).join('')+
+    '</div>'+button('+ 일정 추가','add-event','primary','id="calendar-add"')+'</div>'+
+    '<div class="calendar-toolbar calendar-navigation"><div class="calendar-move" role="group" aria-label="날짜 이동">'+
+    button('‹','calendar-step','icon-button','data-value="-1" aria-label="이전"')+
+    button('오늘','calendar-today','quiet')+button('›','calendar-step','icon-button','data-value="1" aria-label="다음"')+
+    '</div><h2 id="calendar-period" aria-live="polite"></h2><label class="date-jump"><span class="sr-only">선택 날짜</span>'+
+    '<input type="date" id="calendar-date" value="'+state.selectedDate+'"></label></div>'+
+    '<label id="calendar-class-filter" hidden><input id="show-calendar-classes" type="checkbox" '+(state.showCalendarClasses?'checked':'')+'> 월간에 일반 수업 표시</label>'+
+    '<div id="semester-calendar"></div></section><div id="lms-slot"></div>','calendar-body')+bottomNav('calendar');
+}
+function updateCalendarControls(){
+  if(!$('calendar-date'))return;
+  $('calendar-date').value=state.selectedDate;
+  $('calendar-period').textContent=calendarPeriodLabel(state.selectedDate,state.calendarMode);
+  $('semester-calendar').dataset.calendarView=state.calendarMode;
+  highlightCalendarDate($('semester-calendar'),state.selectedDate);
+  $('calendar-class-filter').hidden=state.calendarMode!=='month';
+  $('calendar-add').disabled=!canAddEvent(state.selectedDate);
+  $('calendar-add').title=$('calendar-add').disabled?'시간표를 저장한 학기 안에서 일정을 추가할 수 있어요.':'';
+  for(const control of document.querySelectorAll('[data-action="calendar-mode"]')){
+    control.setAttribute('aria-pressed',String(control.dataset.value===state.calendarMode));
+  }
+}
+function setCalendarDate(date,{mode=state.calendarMode,minute}={}){
+  if(date!==state.selectedDate)state.selectedMinute=null;
+  if(Number.isInteger(minute))state.selectedMinute=minute;
+  const changedMode=mode!==state.calendarMode;
+  state.selectedDate=date;state.calendarMode=mode;
+  updateCalendarControls();
+  calendarWidget?.batchRendering(()=>{
+    if(changedMode){
+      calendarWidget.setOption('height',calendarHeight(mode));
+      calendarWidget.changeView(calendarViews[mode],date);
+      calendarWidget.refetchEvents();
+    }else if(koreanDate(calendarWidget.getDate())!==date)calendarWidget.gotoDate(date);
+  });
+}
+function mountSemesterCalendar(){
+  updateCalendarControls();
+  calendarWidget=mountCalendar($('semester-calendar'),{
+    mode:state.calendarMode,date:state.selectedDate,
+    selectedDate:()=>state.selectedDate,
+    events:()=>toCalendarEvents(allEvents(),{showClasses:state.calendarMode!=='month'||state.showCalendarClasses}),
+    onOpen:openEvent,
+    onDay:date=>setCalendarDate(date,{mode:'day'}),
+    onTime:(date,minute)=>{
+      setCalendarDate(date,{minute});
+      if(canAddEvent(date))addEvent();
+    }
+  });
+}
+function eventEditor(){
+  const d=state.eventDraft,original=state.eventOriginal,cancelled=original?.status==='cancelled';
+  const kinds=original?(original.kind==='class'&&original.seriesId&&!original.retired&&!original.replacedBy?['class','exam']:[original.kind]):['personal','exam','makeup'];
+  const sections=store.data.semester.candidate.sections;
+  const courseOptions=sections.map(s=>'<option value="'+esc(s.courseId)+'" '+(d.courseId===s.courseId?'selected':'')+'>'+esc(s.name)+'</option>').join('');
   const makeupOptions=store.data.events.filter(e=>e.seriesId&&e.status==='cancelled').map(e=>
-    '<option value="'+esc(e.id)+'">'+esc(e.title)+' · '+e.date+' '+timeText(e.start)+'</option>').join('');
-  return body(heading(original?'일정을 조정해요':'새 일정을 더해요',original?'변경된 내용은 학기 일정에 반영돼요.':'시험, 보강, 개인 약속도 함께 관리해요.')+
+    '<option value="'+esc(e.id)+'" '+(d.originalEventId===e.id?'selected':'')+'>'+esc(e.title)+' · '+e.date+' '+timeText(e.start)+'</option>').join('');
+  const linked=store.data.events.find(e=>e.id===original?.originalEventId);
+  const related=linked?esc(linked.title)+' · '+calendarDateLabel(linked.date):esc(sections.find(s=>s.courseId===original?.courseId)?.name);
+  return '<div class="dialog-heading"><h2 id="event-dialog-title">'+(original?'일정 상세 및 편집':'일정 추가')+'</h2>'+
+    button('×','close-event','icon-button','aria-label="일정 닫기"')+'</div>'+
+    (original?'<p class="event-editor-summary"><strong>'+esc(eventKindLabel(original))+'</strong>'+
+      (related?' · '+(linked?(original.kind==='makeup'?'보강 대상 ':'원래 수업 '):'')+related:'')+'</p>':'')+
     '<form id="event-form" class="stack">'+field('일정 이름','<input name="title" required maxlength="100" value="'+esc(d.title)+'">')+
-    field('종류','<select name="kind">'+kinds.map(key=>'<option value="'+key+'" '+(key===d.kind?'selected':'')+'>'+(original&&key==='exam'&&d.kind==='class'?'이 수업을 대체하는 시험':kindLabels[key])+'</option>').join('')+'</select>')+
-    (!original?'<div id="event-course" hidden>'+field('관련 과목','<select name="courseId"><option value="">과목 선택</option>'+courseOptions+'</select>')+'</div>'+
-      '<div id="makeup-original" hidden>'+field('보강할 휴강 수업','<select name="originalEventId"><option value="">연결 없이 추가</option>'+makeupOptions+'</select>')+'</div>':'')+
-    field('날짜','<input name="date" type="date" required min="'+store.data.semester.start+'" max="'+store.data.semester.end+'" value="'+d.date+'">')+
-    '<div class="two-fields">'+field('시작','<input name="start" type="time" required value="'+timeText(d.start)+'">')+field('종료','<input name="end" type="time" required value="'+timeText(d.end)+'">')+'</div>'+
+    field('종류','<select name="kind">'+kinds.map(key=>'<option value="'+key+'" '+(key===d.kind?'selected':'')+'>'+(original?.kind==='class'&&key==='exam'?'이 수업을 대체하는 시험':kindLabels[key])+'</option>').join('')+'</select>')+
+    (!original?'<div id="event-course" '+(d.kind==='personal'?'hidden':'')+'>'+field('관련 과목','<select name="courseId"><option value="">과목 선택</option>'+courseOptions+'</select>')+'</div>'+
+      '<div id="makeup-original" '+(d.kind!=='makeup'?'hidden':'')+'>'+field('보강할 휴강 수업','<select name="originalEventId"><option value="">연결 없이 추가</option>'+makeupOptions+'</select>')+'</div>':'')+
+    field('날짜','<input name="date" type="date" required min="'+store.data.semester.start+'" max="'+store.data.semester.end+'" value="'+esc(d.date)+'">')+
+    '<div class="two-fields">'+field('시작','<input name="start" type="time" required value="'+esc(d.start)+'">')+field('종료','<input name="end" type="time" required value="'+esc(d.end)+'">')+'</div>'+
     field('장소','<input name="location" maxlength="100" placeholder="강의실 또는 약속 장소" value="'+esc(d.location)+'">')+
-    (original?.seriesId&&!original.retired?'<fieldset class="scope-picker"><legend>변경 범위</legend><label><input type="radio" name="scope" value="one" checked>이번 일정만</label><label><input type="radio" name="scope" value="future">이후 같은 반복 수업도</label><small>같은 분반의 같은 요일 수업에 적용돼요.</small></fieldset>':'')+
-    '<p id="event-error" class="form-error" role="alert"></p></form>'+ (cancelled?info('휴강·취소된 일정이에요',original.retired?'이 분반의 정규 일정은 종료되었어요.':'복원하면 학기 일정에 다시 포함돼요.'):'')+
-    (d.replacedBy?info('대체 시험이 연결된 수업이에요','시험을 취소하면 별도 휴강 처리하지 않은 수업이 다시 표시돼요.'):'')+
-    (original?'<div class="inline-actions">'+(cancelled?(original.retired?'':button('일정 복원','resume-event','secondary')):button('휴강 · 일정 취소','cancel-event','danger'))+(original.seriesId?button('원래 수업 정보로 복원','restore-event','quiet'):'')+'</div>':''))+
-    footer(button('변경 저장하기','save-event','primary',cancelled?'disabled':''));
+    (original?.seriesId&&!original.retired?'<fieldset class="scope-picker"><legend>변경 범위</legend><label><input type="radio" name="scope" value="one" '+(d.scope!=='future'?'checked':'')+'>이번 일정만</label><label><input type="radio" name="scope" value="future" '+(d.scope==='future'?'checked':'')+'>이후 같은 반복 수업도</label><small>같은 분반의 같은 요일 수업에 적용돼요.</small></fieldset>':'')+
+    '<p id="event-error" class="form-error" role="alert"></p></form>'+
+    (original?'<div class="inline-actions">'+(cancelled?(original.retired?'':button('일정 복원','resume-event','secondary')):button('휴강 · 일정 취소','cancel-event','danger'))+
+      (original.seriesId?button('원래 수업 정보로 복원','restore-event','quiet'):'')+'</div>':'')+
+    '<div class="event-editor-actions">'+button(original?'변경 저장하기':'일정 저장하기','save-event','primary',cancelled?'disabled':'')+'</div>';
 }
 function exportView(){
   const semester=store.data.semester,active=allEvents().filter(e=>e.status==='active');
@@ -209,18 +269,21 @@ function aiView(){
     '<div class="card ai-connection"><strong>'+(s?.connected?'Codex가 연결되어 있어요':waiting?'브라우저에서 연결을 마쳐 주세요':'Codex 계정 연결')+'</strong><p id="ai-status" role="status">'+esc(state.aiMessage||'본인의 계정으로 요청을 해석하고 추천 이유를 정리해요.')+'</p>'+(waiting?button('연결 취소','cancel-login','secondary'):button(s?.connected?'연결 확인':'Codex 연결','connect','secondary'))+'</div><small>요청 내용에 따라 기존 학점·요일·필수 과목 조건이 바뀔 수 있어요. 결과의 적용 조건을 확인해 주세요.</small>')+
     footer(button('AI로 시간표 추천받기','recommend-ai','primary',s?.connected?'':'disabled')+button('현재 조건으로 기본 추천','recommend','secondary'));
 }
-const views={start:startView,courses:coursesView,preferences:preferencesView,advanced:advancedView,results:resultsView,saved:savedView,career:careerView,calendar:calendarView,event:eventView,export:exportView,experience:experienceView,record:recordView,empty:emptyView,loading:loadingView,error:errorView,ai:aiView};
+const views={start:startView,courses:coursesView,preferences:preferencesView,advanced:advancedView,results:resultsView,saved:savedView,career:careerView,calendar:calendarView,export:exportView,experience:experienceView,record:recordView,empty:emptyView,loading:loadingView,error:errorView,ai:aiView};
 function render(motion='none'){
   const sameRoute=$('content')?.dataset.route===state.route,focused=document.activeElement;
   const scrollTop=sameRoute?document.querySelector('.screen-body')?.scrollTop||0:0;
   const openDetails=sameRoute?[...document.querySelectorAll('main details')].map(el=>el.open):[];
   const focusSelector=sameRoute&&focused?.closest('#app')?(focused.id?'#'+CSS.escape(focused.id):focused.dataset.completed?'[data-completed="'+CSS.escape(focused.dataset.completed)+'"]':focused.dataset.action?'[data-action="'+CSS.escape(focused.dataset.action)+'"]'+['id','value'].filter(k=>focused.dataset[k]!==undefined).map(k=>'[data-'+k+'="'+CSS.escape(focused.dataset[k])+'"]').join(''):null):null;
   const previousTabs=new Map([...document.querySelectorAll('[data-tabs]')].filter(el=>el.offsetWidth).map(el=>[el.dataset.tabs,el.querySelector('[aria-pressed="true"]')?.getBoundingClientRect()]));
-  const wide=['start','saved','results'].includes(state.route),content=(views[state.route]||startView)();
+  const wide=['start','saved','results','calendar'].includes(state.route),content=(views[state.route]||startView)();
   // Keep the LMS controller and its controls alive across the app's route renders.
   const lmsHost=$('lms-panel-host');lmsHost.hidden=true;document.body.append(lmsHost);
+  calendarWidget?.destroy();
+  calendarWidget=null;
   $('app').innerHTML='<div class="app-shell">'+sidebar()+'<div class="workspace"><header class="desktop-topbar"><span>'+semesterLabel()+'</span><span class="user-label">나의 캠퍼스 '+icon('desktopSaved','imgUser')+'</span></header><main id="content" class="screen '+(wide?'wide':'')+'" data-route="'+state.route+'">'+renderHeader()+content+'</main></div></div>';
   if($('lms-slot')){$('lms-slot').append(lmsHost);lmsHost.hidden=false}
+  if($('semester-calendar'))mountSemesterCalendar();
   layoutTimetables();layoutTabs(sameRoute?previousTabs:new Map());
   if(sameRoute)document.querySelectorAll('main details').forEach((el,i)=>el.open=!!openDetails[i]);
   document.querySelector('.screen-body')?.scrollTo(0,scrollTop);
@@ -230,13 +293,13 @@ function render(motion='none'){
     if(state.route==='start')animateElements(document.querySelectorAll('.hero-classes > div'),{distance:18,duration:520,stagger:65});
   }else if(motion==='schedule')animateElements(document.querySelectorAll('.class-block'),{distance:8,duration:300,stagger:18,scale:.97});
   else if(motion==='list')animateElements(document.querySelectorAll('#course-list > .course-card'),{distance:6,duration:240,stagger:25});
-  else if(motion==='agenda')animateElements(document.querySelectorAll('.agenda > *'),{distance:8,duration:260,stagger:35});
 }
 function routeChanged(){
   const route=location.hash.slice(1),next=views[route]?route:(store.data.semester?'saved':'start');
   if(state.busy&&next!=='loading'){state.controller?.abort();state.busy=false;requestVersion++}
+  if($('event-dialog').open){closeDialog();closeEventEditor()}
   clearTimeout(pollTimer);state.route=next;
-  if(next==='event'&&!state.eventDraft){go('calendar');return}
+  if(route==='event'){go('calendar');return}
   if(next==='loading'&&!state.busy){go('preferences');return}
   window.scrollTo(0,0);render('page');document.querySelector('h1')?.focus({preventScroll:true});
   if(next==='ai')checkConnection();
@@ -275,12 +338,39 @@ function openEvent(id){
   const e=allEvents().find(e=>e.id===id);if(!e)return;
   if(e.source==='lms'){
     const last=e.allDay?addDays(e.endDate,-1):e.endDate;
-    dialog('<div class="dialog-heading"><h2 id="dialog-title">'+esc(e.title)+'</h2>'+button('×','close-dialog','icon-button','aria-label="닫기"')+'</div><p>'+dateLabel(e.date)+(last!==e.date?' – '+dateLabel(last):'')+' · '+esc(lmsTimeLabel(e))+'</p><p class="muted">학교에서 가져온 일정이에요. 다시 가져오면 변경 사항을 반영해요.</p>'+(e.sourceUrl?'<a id="lms-event-source" class="button primary" href="'+esc(e.sourceUrl)+'" target="_blank" rel="noopener noreferrer">LMS에서 원문 보기</a>':''));
+    dialog('<div class="dialog-heading"><h2 id="dialog-title">'+esc(e.title)+'</h2>'+button('×','close-dialog','icon-button','aria-label="닫기"')+'</div><p>'+calendarDateLabel(e.date)+(last!==e.date?' – '+calendarDateLabel(last):'')+' · '+esc(lmsTimeLabel(e))+'</p>'+
+      (e.location?'<p>'+esc(e.location)+'</p>':'')+'<p class="muted">학교에서 가져온 일정이에요. 다시 가져오면 변경 사항을 반영해요.</p>'+(e.sourceUrl?'<a id="lms-event-source" class="button primary" href="'+esc(e.sourceUrl)+'" target="_blank" rel="noopener noreferrer">LMS에서 원문 보기</a>':''));
     $('dialog').dataset.lmsAccount=e.accountKey;return;
   }
-  state.editing=id;state.eventDraft={...e};state.eventReturn=state.route==='saved'?'saved':'calendar';go('event');
+  setCalendarDate(e.date);
+  showEventEditor(Object.freeze({...e}),{...e,start:timeText(e.start),end:timeText(e.end)});
 }
-function addEvent(){if(!store.data.semester){go('courses');return}state.editing=null;state.eventDraft={title:'',date:state.selectedDate,start:720,end:780,location:'',kind:'personal'};state.eventReturn='calendar';go('event')}
+function addEvent(){
+  if(!canAddEvent(state.selectedDate))return;
+  const start=state.selectedMinute??720;
+  showEventEditor(null,{title:'',date:state.selectedDate,start:timeText(start),end:timeText(Math.min(start+60,1439)),location:'',kind:'personal'});
+}
+function showEventEditor(original,draft){
+  state.eventOriginal=original;
+  state.eventDraft=draft;
+  const modal=$('event-dialog');
+  modal.innerHTML=eventEditor();
+  modal.showModal();
+}
+function closeEventEditor(){
+  $('event-dialog').close();
+  state.eventOriginal=null;
+  state.eventDraft=null;
+}
+function readEventDraft(form){
+  state.eventDraft=Object.fromEntries(new FormData(form));
+  const kind=state.eventDraft.kind;
+  if($('event-course')){
+    $('event-course').hidden=kind==='personal';
+    $('makeup-original').hidden=kind!=='makeup';
+  }
+  return state.eventDraft;
+}
 function commitCalendar(preview,done,acceptConflicts=false){
   store.apply(preview,{...calendarOptions(),acceptConflicts});
   closeDialog();done(preview);
@@ -305,22 +395,26 @@ function submitCalendar(command,done,confirm=false){
 function saveEvent(action='edit'){
   const form=$('event-form');if(action==='edit'&&!form.reportValidity())return;
   try{
-    const data=new FormData(form),scope=data.get('scope')||'one',draft=state.eventDraft;
-    const fields={title:String(data.get('title')).trim(),date:String(data.get('date')),start:timeValue(data.get('start')),
-      end:timeValue(data.get('end')),location:String(data.get('location')).trim(),kind:String(data.get('kind'))};
-    const replacement=state.editing&&action==='edit'&&draft.kind==='class'&&fields.kind==='exam';
+    const draft=readEventDraft(form),scope=draft.scope||'one',original=state.eventOriginal;
+    const fields={title:draft.title.trim(),date:draft.date,start:timeValue(draft.start),
+      end:timeValue(draft.end),location:draft.location.trim(),kind:draft.kind};
+    const replacement=original?.kind==='class'&&action==='edit'&&fields.kind==='exam';
     if(replacement&&scope==='future')throw new Error('대체 시험은 이번 일정만 선택해 등록해 주세요.');
-    const patch=action==='edit'?Object.fromEntries(Object.entries(fields).filter(([key,value])=>draft[key]!==value)):{};
-    const command=state.editing&&!replacement?{type:'edit',id:state.editing,action,scope,patch}:{type:'add',event:fields};
+    const patch=original&&action==='edit'?Object.fromEntries(Object.entries(fields).filter(([key,value])=>
+      (typeof original[key]==='string'?original[key].trim():original[key])!==value)):{};
+    const command=original&&!replacement?{type:'edit',id:original.id,action,scope,patch}:{type:'add',event:fields};
     if(command.type==='add'&&fields.kind!=='personal'){
-      const originalEventId=replacement?state.editing:fields.kind==='makeup'?data.get('originalEventId'):null;
+      const originalEventId=replacement?original.id:fields.kind==='makeup'?draft.originalEventId:null;
       if(originalEventId)command.originalEventId=originalEventId;
-      if(data.get('courseId'))command.courseId=data.get('courseId');
+      if(draft.courseId)command.courseId=draft.courseId;
       if(fields.kind==='exam')command.examMode=replacement?'replacement':'additional';
     }
     submitCalendar(command,preview=>{
-      state.selectedDate=preview.changes.find(change=>change.type==='add'||change.id===state.editing)?.after?.date||draft.date;
-      go('calendar');flash(action==='cancel'?'일정을 취소했어요.':['restore','resume'].includes(action)?'일정을 복원했어요.':'일정을 저장했어요.');
+      const date=preview.changes.find(change=>change.type==='add'||change.id===original?.id)?.after?.date||original?.date||fields.date;
+      closeEventEditor();
+      setCalendarDate(date);
+      if(state.route==='calendar')calendarWidget?.refetchEvents();else go('calendar');
+      flash(action==='cancel'?'일정을 취소했어요.':['restore','resume'].includes(action)?'일정을 복원했어요.':'일정을 저장했어요.');
     });
   }catch(e){$('event-error').textContent=e.message}
 }
@@ -353,6 +447,7 @@ async function act(action,el){
     case 'retry':if(!state.request)await init();else await recommend(state.lastMode);break;
     case 'confirm':confirmSemester();break;
     case 'close-dialog':closeDialog();break;
+    case 'close-event':closeEventEditor();break;
     case 'section':showSection(el.dataset.id);break;
     case 'section-calendar':{const events=store.data.events.filter(e=>e.courseId===el.dataset.id),upcoming=events.find(e=>e.date>=koreanToday())||events[0];if(upcoming)state.selectedDate=upcoming.date;closeDialog();go('calendar');break}
     case 'track':state.track=el.dataset.value;state.careerPicked=null;render();break;
@@ -360,9 +455,9 @@ async function act(action,el){
     case 'career-course':{const ids=careerIds();state.careerPicked=ids.includes(el.dataset.id)?ids.filter(id=>id!==el.dataset.id):[...ids,el.dataset.id];render();break}
     case 'apply-career':{const ids=careerIds(),r=state.request;r.preferredCourseIds=[...new Set([...r.preferredCourseIds,...ids])].filter(id=>!state.completed.has(id));r.excludedCourseIds=[...new Set([...r.excludedCourseIds,...state.completed])].filter(id=>!ids.includes(id));r.requiredCourseIds=r.requiredCourseIds.filter(id=>!state.completed.has(id));go('courses');flash(ids.length+'과목을 관심 과목에 담았어요.');break}
     case 'example':{const ids=examples[Number(el.dataset.value)].ids.filter(id=>!state.completed.has(id));state.request.preferredCourseIds=[...new Set([...state.request.preferredCourseIds,...ids])];state.request.excludedCourseIds=state.request.excludedCourseIds.filter(id=>!ids.includes(id));go('courses');flash('관심 과목에 담았어요. 필수 과목은 그대로 유지해요.');break}
-    case 'week':state.selectedDate=addDays(state.selectedDate,Number(el.dataset.value));render('agenda');break;
-    case 'date':state.selectedDate=el.dataset.value;render('agenda');break;
-    case 'today':state.selectedDate=koreanToday();render('agenda');break;
+    case 'calendar-mode':setCalendarDate(state.selectedDate,{mode:el.dataset.value});break;
+    case 'calendar-step':setCalendarDate(stepCalendarDate(state.selectedDate,state.calendarMode,Number(el.dataset.value)));break;
+    case 'calendar-today':setCalendarDate(koreanToday());break;
     case 'open-event':openEvent(el.dataset.id);break;
     case 'add-event':addEvent();break;
     case 'save-event':saveEvent();break;
@@ -382,6 +477,8 @@ async function act(action,el){
   }
 }
 document.addEventListener('click',e=>{const el=e.target.closest('[data-action]');if(!el||el.disabled)return;act(el.dataset.action,el).catch(error=>flash(error.message,true))});
+$('dialog').addEventListener('cancel',()=>{pendingCalendar=null});
+$('event-dialog').addEventListener('cancel',event=>{event.preventDefault();closeEventEditor()});
 document.addEventListener('input',e=>{
   const el=e.target,r=state.request;if(!r)return;
   if(el.id==='course-search'){state.query=el.value;$('course-list').innerHTML=courseList()}
@@ -390,7 +487,7 @@ document.addEventListener('input',e=>{
   if(el.id==='note-title')state.noteTitle=el.value;
   if(el.id==='note-body')state.noteBody=el.value;
   if(el.id==='ai-note')r.note=el.value;
-  if(el.closest('#event-form')&&state.eventDraft){if(['title','location','date','kind'].includes(el.name))state.eventDraft[el.name]=el.value;else if(['start','end'].includes(el.name)&&el.value)state.eventDraft[el.name]=timeValue(el.value)}
+  if(el.form?.id==='event-form')readEventDraft(el.form);
 });
 document.addEventListener('change',e=>{
   const el=e.target,r=state.request;if(!r)return;
@@ -401,11 +498,9 @@ document.addEventListener('change',e=>{
   if(el.id==='daily-limit')r.maxCoursesPerDay=el.value?Number(el.value):null;
   if(el.dataset.exclude){const id=el.dataset.exclude;r.excludedCourseIds=el.checked?[...new Set([...r.excludedCourseIds,id])]:r.excludedCourseIds.filter(x=>x!==id);if(el.checked)r.requiredCourseIds=r.requiredCourseIds.filter(x=>x!==id);$('course-list').innerHTML=courseList();$('selection-summary').textContent=selectionSummary()}
   if(el.dataset.completed){if(el.checked)state.completed.add(el.dataset.completed);else state.completed.delete(el.dataset.completed);state.careerPicked=null;const open=el.closest('details')?.open;render();if(open)document.querySelector('details').open=true}
-  if(el.id==='calendar-date'&&el.value){state.selectedDate=el.value;render()}
-  if(el.name==='kind'&&el.form?.id==='event-form'&&$('event-course')){
-    $('event-course').hidden=el.value==='personal';
-    $('makeup-original').hidden=el.value!=='makeup';
-  }
+  if(el.id==='calendar-date'&&el.value)setCalendarDate(el.value);
+  if(el.id==='show-calendar-classes'){state.showCalendarClasses=el.checked;calendarWidget?.refetchEvents()}
+  if(el.form?.id==='event-form')readEventDraft(el.form);
 });
 document.addEventListener('submit',e=>{
   e.preventDefault();if(e.target.id==='relax-form'){
@@ -445,8 +540,9 @@ async function init(){
       },
       showLmsCalendar(){
         const dates=(state.lmsCalendar?.events||[]).map(event=>event.date).sort();
-        state.selectedDate=dates.find(date=>date>=koreanToday())||dates.at(-1)||koreanToday();
-        go('calendar');requestAnimationFrame(()=>document.querySelector('.agenda')?.scrollIntoView({block:'start'}));
+        setCalendarDate(dates.find(date=>date>=koreanToday())||dates.at(-1)||koreanToday(),{mode:'day'});
+        if(state.route!=='calendar')go('calendar');
+        requestAnimationFrame(()=>$('semester-calendar')?.scrollIntoView({block:'start'}));
       }
     })}
   }catch(error){state.error=error.message;state.route='error';render()}

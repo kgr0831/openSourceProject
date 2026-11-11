@@ -23,7 +23,14 @@ files['/ui.js']=['ui.js','text/javascript; charset=utf-8'];
 files['/design-assets.js']=['design-assets.js','text/javascript; charset=utf-8'];
 files['/solver-ui.js']=['solver-ui.js','text/javascript; charset=utf-8'];
 files['/calendar-logic.mjs']=['calendar-logic.mjs','text/javascript; charset=utf-8'];
+files['/calendar-display.mjs']=['calendar-display.mjs','text/javascript; charset=utf-8'];
+files['/calendar-view.js']=['calendar-view.js','text/javascript; charset=utf-8'];
+files['/calendar.css']=['calendar.css','text/css; charset=utf-8'];
 files['/lms.css']=['lms.css','text/css; charset=utf-8'];
+const calendarAssets=new Map([
+  ['calendar.js','all/global.js'], ['theme.js','themes/monarch/global.js'], ['ko.js','locales/ko/global.js'],
+  ['skeleton.css','skeleton.css'], ['theme.css','themes/monarch/theme.css'], ['palette.css','themes/monarch/palettes/blue.css']
+]);
 export function createTimetableServer({port=4317,bridge=new CodexBridge(),createLms=async()=>new (await import('./lms-service.mjs')).LmsCalendarService()}={}) {
 let recommendationBusy=false,lmsPromise=null,lms=null;
 async function getLms(){
@@ -41,6 +48,13 @@ const server=http.createServer(async(req,res)=>{
   res.once('close',()=>{if(!res.writableEnded)controller.abort()});
   try {
     if(req.method==='GET' && files[url.pathname]){const [file,type]=files[url.pathname];return reply(res,200,await readFile(path.join(root,'public',file)),type)}
+    if(req.method==='GET' && url.pathname.startsWith('/vendor/fullcalendar/')){
+      const file=calendarAssets.get(url.pathname.slice('/vendor/fullcalendar/'.length));
+      if(!file)return reply(res,404,{error:'파일을 찾을 수 없습니다.'});
+      const type=file.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8';
+      try{return reply(res,200,await readFile(path.join(root,'node_modules','fullcalendar',file)),type)}
+      catch(error){if(error.code==='ENOENT')return reply(res,404,{error:'캘린더 구성 요소를 먼저 설치해 주세요.'});throw error}
+    }
     if(req.method==='GET' && /^\/assets\/(?:figma\/[A-Za-z0-9-]+\.svg|noto-sans-kr-(?:400|500|700)\.woff2|OFL-NotoSansKR\.txt)$/.test(url.pathname)){
       const type=url.pathname.endsWith('.svg')?'image/svg+xml':url.pathname.endsWith('.woff2')?'font/woff2':'text/plain; charset=utf-8';
       try{return reply(res,200,await readFile(path.join(root,'public',url.pathname.slice(1))),type)}

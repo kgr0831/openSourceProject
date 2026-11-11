@@ -1,0 +1,282 @@
+.screen[data-route="calendar"] {
+  width: 100%;
+  max-width: none;
+}
+
+.calendar-body {
+  min-width: 0;
+  gap: 18px;
+}
+
+.calendar-surface {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.calendar-toolbar,
+.calendar-mode,
+.calendar-move {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.calendar-toolbar {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.calendar-mode {
+  background: #edf1f7;
+  padding: 4px;
+  border-radius: 12px;
+}
+
+.calendar-mode .button {
+  min-height: 36px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.calendar-mode .button[aria-pressed="true"] {
+  color: #153a75;
+  background: #fff;
+  box-shadow: 0 1px 3px #233f681f;
+}
+
+.calendar-navigation {
+  margin-top: 12px;
+}
+
+#calendar-add {
+  width: auto;
+  min-height: 42px;
+}
+
+.calendar-navigation h2 {
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  margin: 0;
+}
+
+.calendar-move .button {
+  min-height: 36px;
+  padding: 5px 10px;
+}
+
+.calendar-navigation .date-jump input {
+  width: auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.calendar-navigation .date-jump {
+  flex: none;
+}
+
+#calendar-class-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.9rem;
+}
+
+#semester-calendar {
+  min-width: 0;
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+}
+
+#semester-calendar [data-calendar-selected] {
+  background: #edf4ff;
+  box-shadow: inset 0 2px #4572b6;
+}
+
+#semester-calendar .calendar-event {
+  cursor: pointer;
+  color: var(--calendar-event-ink);
+  border-inline-start: 3px solid var(--calendar-event-stroke);
+}
+
+.calendar-event-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 4px;
+  min-width: 0;
+  width: 100%;
+  color: var(--calendar-event-ink);
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+.calendar-event-content > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-event-title {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.calendar-event-kind {
+  grid-column: 2;
+  grid-row: 1;
+  max-width: 8rem;
+  padding-inline: 3px;
+  border-radius: 3px;
+  background: var(--calendar-event-fill);
+  color: var(--calendar-event-ink);
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.calendar-event-time,
+.calendar-event-location {
+  grid-column: 1 / -1;
+}
+
+.calendar-event-location {
+  opacity: 0.84;
+}
+
+.calendar-event-exam .calendar-event-kind,
+.calendar-event-makeup .calendar-event-kind {
+  box-shadow: inset 0 0 0 1px var(--calendar-event-stroke);
+}
+
+#semester-calendar .calendar-event-cancelled {
+  opacity: 0.74;
+  border-inline-start-style: dashed;
+}
+
+.calendar-event-cancelled .calendar-event-title {
+  text-decoration: line-through;
+}
+
+.calendar-event-point .calendar-event-content {
+  display: flex;
+  align-items: center;
+}
+
+.calendar-event-point .calendar-event-kind {
+  flex-shrink: 0;
+  max-width: 30%;
+}
+
+#semester-calendar[data-calendar-view="month"] .calendar-event-location {
+  display: none;
+}
+
+#semester-calendar[data-calendar-view="day"] .calendar-event-content {
+  grid-template-columns: minmax(0, 1fr) auto;
+  row-gap: 4px;
+  font-size: 0.875rem;
+}
+
+#semester-calendar[data-calendar-view="day"] .calendar-event-content > * {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#event-dialog {
+  max-width: 540px;
+  overflow-y: auto;
+}
+
+#event-dialog .event-editor-summary {
+  margin-bottom: 14px;
+  overflow-wrap: anywhere;
+}
+
+#dialog[data-lms-account] .dialog-heading h2 {
+  overflow-wrap: anywhere;
+}
+
+#event-dialog .inline-actions,
+.event-editor-actions {
+  margin-top: 12px;
+}
+
+.event-editor-actions > .button {
+  width: 100%;
+}
+
+@media (min-width: 1000px) {
+  .calendar-body {
+    padding: 24px 32px 32px;
+  }
+}
+
+@media (max-width: 640px) {
+  .calendar-body {
+    padding-inline: 10px;
+    gap: 12px;
+  }
+
+  .calendar-surface {
+    padding: 8px;
+    border-radius: 12px;
+  }
+
+  .calendar-toolbar {
+    gap: 8px;
+  }
+
+  .calendar-navigation h2 {
+    order: -1;
+    width: 100%;
+  }
+
+  .calendar-mode .button,
+  #calendar-add {
+    padding-inline: 8px;
+    font-size: 0.8rem;
+  }
+
+  #semester-calendar {
+    font-size: 0.75rem;
+  }
+
+  #semester-calendar .calendar-event {
+    border-inline-start-width: 2px;
+  }
+
+  #semester-calendar:not([data-calendar-view="day"]) .calendar-event-content {
+    grid-template-columns: minmax(0, 1fr);
+    font-size: 0.66rem;
+  }
+
+  #semester-calendar:not([data-calendar-view="day"]) .calendar-event-kind {
+    grid-column: 1;
+    grid-row: 2;
+    padding-inline: 0;
+    font-size: 0.58rem;
+  }
+
+  #semester-calendar:not([data-calendar-view="day"]) .calendar-event-class:not(.calendar-event-cancelled) .calendar-event-kind,
+  #semester-calendar:not([data-calendar-view="day"]) .calendar-event-location {
+    display: none;
+  }
+
+  #semester-calendar:not([data-calendar-view="day"]) .calendar-event-point .calendar-event-kind {
+    display: none;
+  }
+
+  #event-dialog {
+    max-height: calc(100dvh - 24px);
+    padding: 16px;
+  }
+}

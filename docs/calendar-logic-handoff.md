@@ -16,6 +16,16 @@
 
 날짜는 `YYYY-MM-DD`, 시간은 한국 시간(`Asia/Seoul`) 자정부터의 정수 분이다. 예를 들어 09:30은 `570`이다. 날짜 계산은 UTC 달력 연산으로 시스템 시간대의 영향을 피한다. 학기 시작일과 종료일을 모두 포함하고 최대 31주를 허용한다. 후보의 `meetings`는 `[요일, 시작 분, 종료 분]`이며 월요일이 `0`, 일요일이 `6`이다. 휴일·휴강은 사용자가 확인 후 등록한다.
 
+## 표시와 편집 연결
+
+`public/calendar-display.mjs`의 `toCalendarEvents`는 `calendarEvents`로 계산한 표시 상태와 LMS 일정을 FullCalendar 입력으로 변환한다. 내부 일정 ID를 FullCalendar ID로 사용한다. 대체 시험으로 가려진 원래 수업은 화면 이벤트에서 제외하고, 별도 휴강은 휴강 표시로 남긴다. 월간 필터는 변환 결과에서 활성 정규 수업만 숨긴다. 과목 색은 학기의 일정 순서로 배정하므로 보기나 필터를 바꾸어도 동일하다.
+
+`public/calendar-view.js`는 FullCalendar Standard의 `timeGridWeek`, `dayGridMonth`, `listDay`를 사용한다. `timeZone: 'Asia/Seoul'`을 설정하고 수업 시간은 `+09:00`이 붙은 ISO 시각으로 전달한다. LMS 시간 일정은 원래 ISO 시각, 종일 일정은 날짜와 배타적 종료일을 전달한다. 마감은 종료 시각이 없는 시점으로 유지하고, 주간에 그릴 때만 최소 높이의 마커로 표시한다. [시간대](https://fullcalendar.io/docs/timeZone) · [이벤트 종료일 규칙](https://fullcalendar.io/docs/event-parsing)
+
+`app.js`는 편집을 열 때 고정한 원본과 입력 초안을 별도로 관리한다. 저장 직전에 폼 값을 다시 읽어 원본과 비교한 필드만 `edit`로 전달한다. 수업에서 시험으로 바뀌면 `add`와 `examMode: 'replacement'`를 사용한다. 편집 팝업은 캘린더가 다시 렌더링되는 영역 밖에 있고, 충돌 확인을 닫으면 같은 초안으로 돌아온다. `store.apply`가 성공한 뒤에만 변경된 일정을 다시 표시한다. 보기·날짜·월간 필터는 브라우저 화면 상태이며 저장 스키마와 `revision`을 변경하지 않는다.
+
+로컬 번들은 `package.json`에서 FullCalendar `7.1.4`로 고정한다. `prepare-dependencies.mjs`가 Windows 실행 파일과 `npm start`에서 의존성을 준비한다. `server.mjs`는 허용 목록에 있는 번들·테마·로캘 파일을 `/vendor/fullcalendar/`에서 제공한다. [공식 라이선스](https://fullcalendar.io/license) · [배포본 MIT 고지](licenses/fullcalendar.txt)
+
 ## 호출 순서
 
 `public/calendar-logic.mjs`는 DOM, 브라우저 저장소, 추천 엔진 없이 사용할 수 있다. 초기 상태는 `emptyPlanner()`로 만든다. 저장된 JSON은 `loadCalendar(value)`로 검증·마이그레이션한다. `calendarEvents(state.events)`는 화면, 충돌 표시 및 ICS에 사용할 표시 상태를 반환한다. 원래 수업을 대체 시험이 가리는 동안 해당 수업의 표시 상태는 `cancelled`이고 `replacedBy`가 시험 ID를 가리킨다. 저장 상태는 수업 자체의 휴강 여부를 기록한다.
@@ -88,10 +98,13 @@ const fields = {title: '중간시험', date: '2026-10-26', start: 540, end: 630,
 
 ```powershell
 cd timetable-demo
+node prepare-dependencies.mjs
 node examples/calendar-workflow.mjs
-node --test tests/calendar-logic.test.mjs
+node --test tests/calendar-logic.test.mjs tests/calendar-display.test.mjs
 npm test
 npm run test:ui
 ```
 
 예제는 시간표 확정, 휴강, 보강과 개인 일정 충돌 확인, 보강 등록 되돌리기, 분반 교체 후 개인 일정·휴강·시험 보존을 검증한다. `npm test`에는 기존 추천 테스트가 포함되므로 최초 실행 전 `npm run setup:solver`가 필요하다. UI 검증은 `lms-parser`의 고정 npm 의존성과 Chrome을 사용한다.
+
+`tests/calendar-browser.mjs`는 실제 `select` 입력과 저장으로 대체 시험을 검증한다. 로스앤젤레스 시간대로 설정한 Chrome에서 한국 시간, 종일 종료일, 자정을 넘는 LMS 일정을 확인한다. 실제 학교 로그인과 Codex 실계정 호출은 검증 범위에서 제외한다. 스크린샷은 `.ui-qa/` 또는 `TIMETABLE_SCREENSHOT_DIR`에 생성한다.

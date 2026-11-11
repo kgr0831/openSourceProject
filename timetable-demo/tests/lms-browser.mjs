@@ -47,8 +47,10 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
   await page.waitForFunction(()=>document.querySelector('#lms-result-title').textContent.includes('3개'));
   assert.deepEqual(app.state.job.courseIds,['10']);assert.equal(await page.locator('#calendar-date').isVisible(),true);
   await page.locator('#calendar-date').fill('2026-11-10');
-  assert.match(await page.locator('.agenda').innerText(),/23:59 마감/);
-  await page.locator('.agenda-item').filter({hasText:'개인 마감'}).click();
+  await page.locator('[data-action="calendar-mode"][data-value="day"]').click();
+  const deadline=page.locator('[data-calendar-event][aria-label*="개인 마감"]');
+  assert.match(await deadline.getAttribute('aria-label'),/23:59 마감/);
+  await deadline.click();
   assert.equal(await page.locator('#lms-event-source').getAttribute('href'),'https://canvas.ssu.ac.kr/courses/10/assignments/20');
   await page.locator('#dialog [data-action="close-dialog"]').click();
   await page.locator('#content a[href="#export"]').click();
@@ -91,7 +93,7 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
 
 test('브라우저에서 휴강, 충돌 확인, 보강 연결, 분반 변경 미리보기와 개인 일정 보존을 확인한다',{timeout:45000},async t=>{
   const server=createTimetableServer({port:0,bridge:{close(){}},createLms:async()=>({
-    resume(){},view:()=>({connected:false}),async close(){}
+    resume(){},view:()=>({connection:'disconnected'}),async close(){}
   })});
   await new Promise((resolve,reject)=>server.once('error',reject).listen(0,'127.0.0.1',resolve));
   t.after(async()=>{await server.closeServices();await new Promise(resolve=>server.close(resolve))});
@@ -128,14 +130,14 @@ test('브라우저에서 휴강, 충돌 확인, 보강 연결, 분반 변경 미
   const originalId=JSON.parse(await saved()).events[0].id;
   await route('calendar');
   await page.locator('#calendar-date').fill('2026-10-19');
-  await page.locator('.agenda-item[data-id="'+originalId+'"]').click();
+  await page.locator('[data-calendar-event="'+originalId+'"]').click();
   await action('cancel-event').click();
-  await page.locator('.agenda-item.cancelled[data-id="'+originalId+'"]').waitFor();
+  await page.locator('.calendar-event-cancelled[data-calendar-event="'+originalId+'"]').waitFor();
 
   await action('add-event').click();
   await input('title').fill('개인 약속');
   await action('save-event').click();
-  await page.locator('.agenda-item').filter({hasText:'개인 약속'}).waitFor();
+  await page.locator('[data-calendar-event][aria-label*="개인 약속"]').waitFor();
   await action('add-event').click();
   await input('kind').selectOption('makeup');
   await input('originalEventId').selectOption(originalId);
@@ -143,7 +145,7 @@ test('브라우저에서 휴강, 충돌 확인, 보강 연결, 분반 변경 미
   await action('save-event').click();
   await page.locator('#dialog').getByText(/개인 약속 \/ 수업 보강|수업 보강 \/ 개인 약속/).waitFor();
   await action('apply-calendar').click();
-  await page.locator('.agenda-item').filter({hasText:'수업 보강'}).waitFor();
+  await page.locator('[data-calendar-event][aria-label*="수업 보강"]').waitFor();
 
   const before=await saved();
   await route('results');

@@ -10,6 +10,10 @@
   <link rel="preload" href="/assets/noto-sans-kr-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/lms.css">
+  <link rel="stylesheet" href="/vendor/fullcalendar/skeleton.css">
+  <link rel="stylesheet" href="/vendor/fullcalendar/theme.css">
+  <link rel="stylesheet" href="/vendor/fullcalendar/palette.css">
+  <link rel="stylesheet" href="/calendar.css">
 </head>
 <body>
   <a class="skip-link" href="#content">본문으로 이동</a>
@@ -34,7 +38,11 @@
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <dialog id="dialog" aria-labelledby="dialog-title"></dialog>
+  <dialog id="event-dialog" aria-labelledby="event-dialog-title"></dialog>
   <noscript>시간표를 사용하려면 브라우저의 JavaScript를 켜 주세요.</noscript>
+  <script src="/vendor/fullcalendar/calendar.js" defer></script>
+  <script src="/vendor/fullcalendar/theme.js" defer></script>
+  <script src="/vendor/fullcalendar/ko.js" defer></script>
   <script src="/app.js" type="module"></script>
 </body>
 </html>

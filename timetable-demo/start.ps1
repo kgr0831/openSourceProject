@@ -18,8 +18,8 @@ try {
     $nodeVersion = & $nodePath --version
     if ($LASTEXITCODE -ne 0 -or [version]$nodeVersion.TrimStart('v') -lt [version]'20.18.1') { throw 'Node.js 20.18.1 이상이 필요합니다.' }
 
-    & $nodePath (Join-Path $PSScriptRoot 'prepare-lms.mjs')
-    if ($LASTEXITCODE -ne 0) { throw 'LMS 구성 요소를 준비하지 못했습니다. 위의 안내를 확인해 주세요.' }
+    & $nodePath (Join-Path $PSScriptRoot 'prepare-dependencies.mjs')
+    if ($LASTEXITCODE -ne 0) { throw '데모 구성 요소를 준비하지 못했습니다. 위의 안내를 확인해 주세요.' }
     & $nodePath (Join-Path $PSScriptRoot 'scripts/check-solver.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Python 3.10 이상을 설치하고 timetable-demo 폴더에서 npm run setup:solver를 실행해 주세요.' }
 
