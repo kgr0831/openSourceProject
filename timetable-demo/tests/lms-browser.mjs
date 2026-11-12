@@ -159,7 +159,7 @@ test('브라우저에서 휴강, 충돌 확인, 보강 연결, 분반 변경 미
   assert.equal(await reviews.count(),2);
   assert.equal(await saved(),before);
   for(const select of await reviews.all())await select.selectOption('keep');
-  await page.locator('#calendar-review button[type="submit"]').click();
+  await page.locator('button[form="calendar-review"]').click();
   assert.equal(await saved(),before);
   await action('apply-calendar').click();
   await page.locator('main[data-route="saved"]').waitFor();

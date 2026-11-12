@@ -1,5 +1,5 @@
 import {addDays, kindLabels, parseDate, timeText, weekStart} from './planner-core.mjs';
-import {lmsKindLabel, lmsTimeLabel} from './lms-calendar.mjs';
+import {agendaEvents, lmsKindLabel, lmsTimeLabel} from './lms-calendar.mjs';
 
 export const calendarTimeZone = 'Asia/Seoul';
 export const calendarViews = {week: 'timeGridWeek', month: 'dayGridMonth', day: 'listDay'};
@@ -28,6 +28,20 @@ export function calendarPeriodLabel(date, mode) {
   if (mode === 'month') return date.slice(0, 4) + '년 ' + Number(date.slice(5, 7)) + '월';
   const monday = weekStart(date);
   return calendarDateLabel(monday) + ' – ' + calendarDateLabel(addDays(monday, 6));
+}
+
+export function calendarWeekBounds(events, date) {
+  const monday = weekStart(date);
+  let start = 480, end = 1140;
+  for (const event of agendaEvents(events, monday, addDays(monday, 6))) {
+    if (event.allDay || event.replacedBy) continue;
+    start = Math.min(start, event.start);
+    end = Math.max(end, event.point ? event.start + 1 : event.end);
+  }
+  return {
+    slotMinTime: timeText(Math.floor(start / 60) * 60) + ':00',
+    slotMaxTime: timeText(Math.ceil(end / 60) * 60) + ':00'
+  };
 }
 
 const courseKey = event => event.courseId && (event.source === 'lms' ? 'lms:' : 'course:') + event.courseId;

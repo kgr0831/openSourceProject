@@ -1,8 +1,6 @@
 import {calendarTimeZone, calendarViews, koreanDate} from './calendar-display.mjs';
 import {timeValue} from './planner-core.mjs';
 
-export const calendarHeight = mode => mode === 'week' ? 650 : 'auto';
-
 export function highlightCalendarDate(element, date) {
   for (const cell of element.querySelectorAll('[data-calendar-day], [data-calendar-header]')) {
     cell.toggleAttribute('data-calendar-selected', (cell.dataset.calendarDay || cell.dataset.calendarHeader) === date);
@@ -29,14 +27,14 @@ function eventContent({event, timeText, view}) {
   return {domNodes: [element]};
 }
 
-export function mountCalendar(element, {mode, date, selectedDate, events, onOpen, onDay, onTime}) {
+export function mountCalendar(element, {mode, date, selectedDate, weekBounds, events, onOpen, onDay, onTime}) {
   if (!globalThis.FullCalendar?.Calendar) {
     element.textContent = '캘린더 구성 요소를 읽지 못했어요. 시간표 데모 시작 파일을 다시 실행해 주세요.';
     return null;
   }
   const calendar = new globalThis.FullCalendar.Calendar(element, {
     initialView: calendarViews[mode], initialDate: date, timeZone: calendarTimeZone, locale: 'ko',
-    firstDay: 1, headerToolbar: false, height: calendarHeight(mode), scrollTime: '07:45:00', scrollTimeReset: false,
+    firstDay: 1, headerToolbar: false, height: 'auto', ...weekBounds,
     slotDuration: '00:30:00', slotMinHeight: 16, slotHeaderFormat: {hour: '2-digit', minute: '2-digit', hour12: false},
     dayHeaderFormat: {weekday: 'short', day: 'numeric'},
     eventTimeFormat: {hour: '2-digit', minute: '2-digit', hour12: false},
@@ -44,6 +42,13 @@ export function mountCalendar(element, {mode, date, selectedDate, events, onOpen
     defaultTimedEventDuration: {milliseconds: 1}, forceEventDuration: false,
     aspectRatio: 1.75, fixedWeekCount: false, dayMaxEvents: 3, editable: false, eventInteractive: true, navLinks: true,
     views: {dayGridMonth: {eventDisplay: 'block'}},
+    navLinkClass: 'calendar-date-link',
+    moreLinkClass: 'calendar-more',
+    moreLinkClick(info) {
+      const day = koreanDate(info.date);
+      queueMicrotask(() => onDay(day));
+      return calendarViews.day;
+    },
     events(_range, success) { success(events()); },
     datesSet() { highlightCalendarDate(element, selectedDate()); },
     navLinkDayClick(day) { onDay(koreanDate(day)); },

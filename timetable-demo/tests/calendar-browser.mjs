@@ -5,9 +5,10 @@ import {mkdir} from 'node:fs/promises';
 import path from 'node:path';
 import {createTimetableServer} from '../server.mjs';
 import {createSemesterEvents, emptyPlanner, koreanToday} from '../public/planner-core.mjs';
+import {applyCalendar, previewCalendar} from '../public/calendar-logic.mjs';
 import {storageKey} from '../public/planner.js';
 
-const {chromium} = createRequire(new URL('../../lms-parser/package.json', import.meta.url))('playwright');
+const {chromium, webkit} = createRequire(new URL('../../lms-parser/package.json', import.meta.url))('playwright');
 const start = '2026-11-09', end = '2026-12-06';
 const sections = [
   {id: 'db-01', courseId: 'db', name: '데이터베이스', building: '정보과학관', meetings: [[0, 540, 630], [2, 660, 720]]},
@@ -22,7 +23,7 @@ function fixture() {
   return {...emptyPlanner(), semester: {start, end, candidate}, events: createSemesterEvents(candidate, start, end)};
 }
 
-async function openCalendar(t, data = fixture(), {lms, ...options} = {}) {
+async function openCalendar(t, data = fixture(), {lms, engine = 'chromium', ...options} = {}) {
   const server = createTimetableServer({port: 0, bridge: {close() {}}, createLms: async () => ({
     resume() {}, view: lms || (() => ({connection: 'disconnected'})), async close() {}
   })});
@@ -31,7 +32,8 @@ async function openCalendar(t, data = fixture(), {lms, ...options} = {}) {
     await server.closeServices();
     await new Promise(resolve => server.close(resolve));
   });
-  const browser = await chromium.launch({channel: 'chrome', headless: true});
+  const browser = engine === 'webkit' ? await webkit.launch({headless: true}) :
+    await chromium.launch({channel: 'chrome', headless: true});
   t.after(() => browser.close());
   const page = await browser.newPage({viewport: {width: 1440, height: 1050},
     timezoneId: 'America/Los_Angeles', reducedMotion: 'reduce', ...options});
@@ -47,7 +49,7 @@ async function openCalendar(t, data = fixture(), {lms, ...options} = {}) {
   }, {key: storageKey, data});
   const base = 'http://127.0.0.1:' + server.address().port;
   await page.goto(base + '/#calendar');
-  return {page, base, saved: async () => JSON.parse(await page.evaluate(key => localStorage.getItem(key), storageKey))};
+  return {page, base, errors, saved: async () => JSON.parse(await page.evaluate(key => localStorage.getItem(key), storageKey))};
 }
 
 test('실제 수업 편집 select에서 대체 시험을 선택하면 원래 수업에 연결된다', {timeout: 20000}, async t => {
@@ -85,8 +87,8 @@ const editor = page => page.locator('#event-dialog');
 const preview = page => page.locator('#dialog');
 const getEvent = (state, id) => state.events.find(event => event.id === id);
 
-async function screenshot(page, name, target = page) {
-  const directory = path.resolve(process.env.TIMETABLE_SCREENSHOT_DIR || '.ui-qa');
+async function screenshot(page, name, target = page, output = process.env.TIMETABLE_SCREENSHOT_DIR) {
+  const directory = path.resolve(output || '.ui-qa');
   await mkdir(directory, {recursive: true});
   await page.evaluate(() => document.fonts.ready.then(() => true));
   await page.locator('#toast').waitFor({state: 'hidden', timeout: 7000});
@@ -158,7 +160,7 @@ test('월간 필터, 일간 선택, 날짜 이동, 추가와 충돌 확인이 �
   const beforeConflict = await saved();
   await action(page, 'save-event').click();
   assert.match(await preview(page).innerText(), /컴퓨터 네트워크.*10:15–11:00/);
-  await preview(page).locator('[data-action="close-dialog"]').click();
+  await preview(page).getByRole('button', {name: '계속 편집'}).click();
   assert.equal(await eventField(page, 'title').inputValue(), '조별 과제 회의');
   assert.equal(await eventField(page, 'start').inputValue(), '10:15');
   assert.deepEqual(await saved(), beforeConflict);
@@ -331,3 +333,233 @@ test('LA 시간대 Chrome에서 LMS 마감·종일·자정 넘는 일정과 편�
   assert.equal(getEvent(await saved(), classId).title, '편집 중인 이름');
   assert.equal(getEvent(await saved(), classId).location, '편집 중인 장소');
 });
+
+const longCourse = '데이터베이스 설계와 대규모 데이터 처리 실습';
+const longPlace = '정보과학관 디지털 융합 실습센터 동쪽 별관 B101호';
+const responsiveOutput = process.env.TIMETABLE_RESPONSIVE_SCREENSHOT_DIR;
+
+function responsiveFixture() {
+  const candidate = {credits: 12, sections: [
+    {...sections[0], name: longCourse, building: '정보과학관 디지털 융합 실습센터 동쪽 별관', room: 'B101호'},
+    ...sections.slice(1)
+  ]};
+  let state = {...emptyPlanner(), semester: {start, end, candidate}, events: createSemesterEvents(candidate, start, end)};
+  function commit(command) {
+    const plan = previewCalendar(state, command);
+    assert.ok(plan.ok && !plan.requiresReview, JSON.stringify(plan.errors));
+    state = applyCalendar(state, plan, {acceptConflicts: true});
+  }
+  const cancelled = 'math-01:2026-11-09:0';
+  commit({type: 'edit', id: cancelled, action: 'cancel'});
+  commit({type: 'add', examMode: 'additional', courseId: 'db',
+    event: {kind: 'exam', date: start, title: '데이터베이스 중간시험', start: 560, end: 620, location: longPlace}});
+  commit({type: 'add', courseId: 'math', originalEventId: cancelled,
+    event: {kind: 'makeup', date: start, title: '이산수학 보강', start: 900, end: 975, location: '진리관'}});
+  commit({type: 'add', event: {kind: 'personal', date: start, title: '팀 프로젝트 회의', start: 680, end: 750, location: '도서관'}});
+  commit({type: 'add', event: {kind: 'personal', date: '2026-11-15', title: '주말 개인 일정', start: 900, end: 960, location: ''}});
+  return state;
+}
+
+async function assertPlannerWidth(page, width, selector = '.planner-screen') {
+  const layout = await page.locator(selector).evaluate(el => {
+    const content = el.getBoundingClientRect();
+    return {left: content.left, right: content.right, viewport: document.documentElement.clientWidth,
+      pageWidth: document.documentElement.scrollWidth};
+  });
+  assert.ok(layout.pageWidth <= layout.viewport + 1, '페이지 가로 넘침 없음 · ' + width);
+  assert.ok(layout.left >= -1 && layout.right <= layout.viewport + 1, '화면 안에 콘텐츠 배치 · ' + width);
+}
+
+async function assertControlTargets(page, selector) {
+  const targets = await page.locator(selector).evaluateAll(nodes => nodes
+    .filter(node => node.getClientRects().length)
+    .map(node => {
+      const rect = node.getBoundingClientRect();
+      return {name: node.getAttribute('aria-label') || node.textContent, width: rect.width, height: rect.height};
+    }));
+  assert.ok(targets.length);
+  for (const target of targets) {
+    assert.ok(target.width >= 43.5 && target.height >= 43.5, JSON.stringify(target));
+  }
+}
+
+async function assertSheetActions(page, viewportHeight) {
+  const buttons = [action(page, 'close-event'), action(page, 'save-event')];
+  for (const button of buttons) {
+    const box = await button.boundingBox();
+    assert.ok(box && box.height >= 43.5 && box.y >= 0 && box.y + box.height <= viewportHeight + 1);
+  }
+  const fits = await editor(page).locator('.planner-dialog-body').evaluate(el => el.scrollHeight > el.clientHeight);
+  assert.ok(fits, '짧은 화면에서는 입력 본문만 세로로 스크롤된다');
+}
+
+async function navigatePlanner(page, route, tap = false) {
+  const link = page.locator((tap ? '.bottom-nav' : '.sidebar') + ' a[href="#' + route + '"]');
+  await (tap ? link.tap() : link.click());
+  await page.locator('.planner-screen[data-route="' + route + '"]').waitFor();
+}
+
+test('Chromium 터치 화면 320–768px과 가로 회전에서 격자·일간 보기·편집을 검증한다', {timeout: 45000}, async t => {
+  const initial = responsiveFixture();
+  const {page, saved} = await openCalendar(t, initial, {viewport: {width: 390, height: 780}, isMobile: true, hasTouch: true});
+  const host = page.locator('#semester-calendar');
+  const grid = page.locator('#calendar-grid-scroll');
+  const exam = initial.events.find(event => event.kind === 'exam');
+  const mondayEvents = initial.events.filter(event => event.date === start);
+  await dateInput(page).fill(start);
+  await calendarEvent(page, classId).waitFor();
+  const stroke = await calendarEvent(page, exam.id).evaluate(el => getComputedStyle(el).borderInlineStartColor);
+  for (const [width, height] of [[320, 568], [360, 640], [390, 780], [430, 860], [768, 1024]]) {
+    await page.setViewportSize({width, height});
+    await assertPlannerWidth(page, width);
+    await assertControlTargets(page, '.calendar-toolbar button, .bottom-nav a');
+    assert.ok(await page.evaluate(() => {
+      const body = document.querySelector('.screen-body').getBoundingClientRect();
+      const nav = document.querySelector('.bottom-nav').getBoundingClientRect();
+      return body.bottom <= nav.top + 1 && nav.bottom <= innerHeight + 1;
+    }), '하단 메뉴는 본문을 덮지 않는다');
+    assert.ok(await grid.evaluate(el => el.scrollWidth > el.clientWidth), '주간 격자 내부에서 좌우 이동');
+    assert.ok(await page.locator('.calendar-surface .planner-grid-guide').isVisible());
+    for (const mode of ['month', 'day', 'week']) {
+      await viewMode(page, mode).tap();
+      await assertPlannerWidth(page, width);
+      assert.equal(await dateInput(page).inputValue(), start);
+    }
+    await navigatePlanner(page, 'saved', true);
+    await assertPlannerWidth(page, width);
+    const savedGrid = page.locator('#saved-grid-scroll');
+    assert.equal(await savedGrid.evaluate(el => el.scrollWidth > el.clientWidth), width < 640);
+    await navigatePlanner(page, 'calendar', true);
+    assert.deepEqual(await saved(), initial);
+  }
+
+  await viewMode(page, 'month').tap();
+  await screenshot(page, 'responsive-tablet-month.png', page, responsiveOutput);
+  await page.setViewportSize({width: 390, height: 780});
+  await page.locator('#show-calendar-classes').uncheck();
+  await calendarEvent(page, classId).waitFor({state: 'detached'});
+  assert.equal(await calendarEvent(page, exam.id).evaluate(el => getComputedStyle(el).borderInlineStartColor), stroke);
+  await host.locator('.calendar-more').first().tap();
+  assert.equal(await host.getAttribute('data-calendar-view'), 'day');
+  assert.equal(await dateInput(page).inputValue(), start);
+  for (const event of mondayEvents) await calendarEvent(page, event.id).waitFor();
+  assert.match(await calendarEvent(page, classId).innerText(), /데이터베이스 설계와 대규모 데이터 처리 실습/);
+  assert.match(await calendarEvent(page, classId).innerText(), /B101호/);
+  assert.equal(await calendarEvent(page, exam.id).evaluate(el => getComputedStyle(el).borderInlineStartColor), stroke);
+  await dateInput(page).fill('2026-11-14');
+  await host.getByText(/일정이 없습니다/).waitFor();
+  await dateInput(page).fill(start);
+  await viewMode(page, 'week').tap();
+  await screenshot(page, 'responsive-mobile-week.png', page, responsiveOutput);
+
+  const header = await grid.locator('[data-calendar-header="' + start + '"]').boundingBox();
+  const box = await grid.boundingBox();
+  const x = box.x + box.width - 32, y = header.y + header.height / 2;
+  const touch = await page.context().newCDPSession(page);
+  await touch.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x, y}]});
+  for (const delta of [28, 70, 112, 160]) {
+    await touch.send('Input.dispatchTouchEvent', {type: 'touchMove', touchPoints: [{x: x - delta, y}]});
+  }
+  await touch.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []});
+  await page.waitForFunction(() => document.getElementById('calendar-grid-scroll').scrollLeft > 20);
+  assert.deepEqual(await saved(), initial);
+
+  await viewMode(page, 'day').tap();
+  await calendarEvent(page, classId).tap();
+  assert.match(await editor(page).locator('.event-editor-summary').innerText(), /B101호/);
+  await eventField(page, 'title').fill(longCourse + ' 보충 실습');
+  await eventField(page, 'date').fill('2026-11-12');
+  await eventField(page, 'start').fill('15:30');
+  await eventField(page, 'end').fill('16:30');
+  await eventField(page, 'location').fill('정보과학관 실습 준비실');
+  await eventField(page, 'location').focus();
+  await page.setViewportSize({width: 844, height: 390});
+  await assertPlannerWidth(page, 844);
+  await assertSheetActions(page, 390);
+  await screenshot(page, 'responsive-mobile-landscape-editor.png', page, responsiveOutput);
+  await page.setViewportSize({width: 844, height: 265});
+  await assertSheetActions(page, 265);
+  await page.waitForFunction(() => {
+    const field = document.activeElement;
+    if (field?.name !== 'location') return false;
+    const input = field.getBoundingClientRect(), body = field.closest('.planner-dialog-body').getBoundingClientRect();
+    return input.top >= body.top - 1 && input.bottom <= body.bottom + 1;
+  });
+  assert.equal(await eventField(page, 'title').inputValue(), longCourse + ' 보충 실습');
+  assert.equal(await eventField(page, 'date').inputValue(), '2026-11-12');
+  assert.equal(await eventField(page, 'start').inputValue(), '15:30');
+  assert.equal(await eventField(page, 'end').inputValue(), '16:30');
+  assert.equal(await eventField(page, 'location').inputValue(), '정보과학관 실습 준비실');
+  assert.deepEqual(await saved(), initial);
+  await action(page, 'save-event').tap();
+  await editor(page).waitFor({state: 'hidden'});
+  await page.setViewportSize({width: 390, height: 780});
+  await page.reload();
+  await dateInput(page).fill('2026-11-12');
+  const current = await saved();
+  assert.equal(current.revision, initial.revision + 1);
+  assert.equal(current.events.length, initial.events.length);
+  assert.match(await calendarEvent(page, classId).getAttribute('aria-label'), /보충 실습.*15:30–16:30.*정보과학관 실습 준비실/);
+});
+
+test('Chromium PC 1024px과 1440px에서 시간표와 캘린더 배치가 가용 폭을 사용한다', {timeout: 25000}, async t => {
+  const initial = responsiveFixture();
+  const {page, saved} = await openCalendar(t, initial, {viewport: {width: 1024, height: 720}});
+  await dateInput(page).fill(start);
+  for (const [width, height] of [[1024, 720], [1440, 1000]]) {
+    await page.setViewportSize({width, height});
+    await assertPlannerWidth(page, width);
+    assert.equal(await page.locator('.bottom-nav').isVisible(), false);
+    await navigatePlanner(page, 'saved');
+    await assertPlannerWidth(page, width);
+    const course = page.locator('.class-block[data-id="db"]').first();
+    assert.match(await course.innerText(), /09:00–10:30/);
+    await course.click();
+    assert.match(await preview(page).innerText(), /정보과학관 디지털 융합 실습센터 동쪽 별관 B101호/);
+    await preview(page).locator('[data-action="close-dialog"]').click();
+    const [table, side] = await Promise.all([page.locator('.schedule-main').boundingBox(), page.locator('.saved-side').boundingBox()]);
+    assert.ok(width === 1440 ? side.x > table.x + table.width : side.y > table.y);
+    if (width === 1440) await screenshot(page, 'responsive-desktop-timetable.png', page, responsiveOutput);
+    await navigatePlanner(page, 'calendar');
+    assert.ok((await page.locator('.calendar-surface').boundingBox()).width > width - 280);
+  }
+  await screenshot(page, 'responsive-desktop-calendar.png', page, responsiveOutput);
+  assert.deepEqual(await saved(), initial);
+});
+
+test('WebKit 모바일 에뮬레이션에서 더 보기·가로 전환·터치 저장을 검증한다',
+  {timeout: 30000, skip: !process.env.TIMETABLE_TEST_WEBKIT && 'TIMETABLE_TEST_WEBKIT=1 및 Playwright WebKit 필요'}, async t => {
+    const initial = responsiveFixture();
+    const {page, saved, errors} = await openCalendar(t, initial,
+      {engine: 'webkit', viewport: {width: 390, height: 760}, isMobile: true, hasTouch: true});
+    await dateInput(page).fill(start);
+    await assertPlannerWidth(page, 390);
+    await viewMode(page, 'month').tap();
+    // WebKit can defer an observer notification by one frame when DayGrid first sizes its rows.
+    // Confirm the month fits after that frame, and treat any subsequent browser error as a failure.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const deferred = 'ResizeObserver loop completed with undelivered notifications.';
+    if (errors[0] === deferred) {
+      assert.deepEqual(errors.splice(0), [deferred]);
+      t.diagnostic('WebKit에서 월간 전환 중 크기 알림 1회 지연');
+    }
+    await assertPlannerWidth(page, 390);
+    await page.locator('.calendar-more').first().tap();
+    assert.equal(await dateInput(page).inputValue(), start);
+    await calendarEvent(page, classId).tap();
+    await eventField(page, 'location').fill('WebKit 실습실');
+    await page.setViewportSize({width: 844, height: 390});
+    await assertSheetActions(page, 390);
+    assert.equal(await eventField(page, 'location').inputValue(), 'WebKit 실습실');
+    await action(page, 'save-event').tap();
+    await preview(page).getByRole('button', {name: '계속 편집'}).tap();
+    assert.equal(await eventField(page, 'location').inputValue(), 'WebKit 실습실');
+    assert.deepEqual(await saved(), initial);
+    await action(page, 'save-event').tap();
+    await action(page, 'apply-calendar').tap();
+    await editor(page).waitFor({state: 'hidden'});
+    await page.reload();
+    await dateInput(page).fill(start);
+    assert.equal(getEvent(await saved(), classId).location, 'WebKit 실습실');
+    assert.equal((await saved()).revision, initial.revision + 1);
+  });

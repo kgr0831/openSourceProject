@@ -26,6 +26,10 @@
 
 로컬 번들은 `package.json`에서 FullCalendar `7.1.4`로 고정한다. `prepare-dependencies.mjs`가 Windows 실행 파일과 `npm start`에서 의존성을 준비한다. `server.mjs`는 허용 목록에 있는 번들·테마·로캘 파일을 `/vendor/fullcalendar/`에서 제공한다. [공식 라이선스](https://fullcalendar.io/license) · [배포본 MIT 고지](licenses/fullcalendar.txt)
 
+내 시간표와 주간 캘린더는 자체 가로 스크롤 영역에 최소 열 너비를 둔다. 날짜에 따른 일정 범위는 `calendarWeekBounds`가 계산한다. FullCalendar v7이 컨테이너 크기 변화를 감지해 격자를 다시 계산하므로 창 크기에 따라 위젯을 다시 생성하거나 `updateSize()`를 호출할 필요가 없다. 월간의 더보기는 선택 날짜를 지정해 `listDay`로 전환한다. [FullCalendar v7 크기 변경](https://fullcalendar.io/docs/upgrading-from-v6#sizing-scrollbars) · [더보기 동작](https://fullcalendar.io/docs/moreLinkClick)
+
+상세·편집·확인 대화상자는 본문만 세로로 스크롤되도록 구성한다. 모바일에서 시트 높이와 하단 위치는 `VisualViewport`를 기준으로 계산하며, 화면 배율이 바뀐 상태에서는 CSS 뷰포트 단위를 사용한다. 창 크기 변경, 회전, 보기 전환은 기존 저장 상태와 편집 입력을 수정하지 않는다.
+
 ## 호출 순서
 
 `public/calendar-logic.mjs`는 DOM, 브라우저 저장소, 추천 엔진 없이 사용할 수 있다. 초기 상태는 `emptyPlanner()`로 만든다. 저장된 JSON은 `loadCalendar(value)`로 검증·마이그레이션한다. `calendarEvents(state.events)`는 화면, 충돌 표시 및 ICS에 사용할 표시 상태를 반환한다. 원래 수업을 대체 시험이 가리는 동안 해당 수업의 표시 상태는 `cancelled`이고 `replacedBy`가 시험 ID를 가리킨다. 저장 상태는 수업 자체의 휴강 여부를 기록한다.

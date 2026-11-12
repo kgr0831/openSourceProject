@@ -71,7 +71,7 @@ export function createSemesterEvents(candidate,start,end) {
   if(!events.length)throw new Error('선택한 기간에 수업이 없어요. 학기 시작일과 종료일을 확인해 주세요.');
   return events;
 }
-function sectionLocation({building,room}){return [building,room].filter(Boolean).join(' ')}
+export function sectionLocation({building,room}){return [building,room].filter(Boolean).join(' ')}
 const editableFields=['title','date','start','end','location','kind'];
 export function editEvents(events,id,patch,{scope='one',action='edit',period,skipIds=new Set(),useOriginalDates=false}={}) {
   const target=events.find(event=>event.id===id);
