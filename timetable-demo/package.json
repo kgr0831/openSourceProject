@@ -4,15 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prestart": "node prepare-lms.mjs",
+    "prestart": "node prepare-dependencies.mjs",
     "start": "node server.mjs --open",
     "setup:solver": "node scripts/setup-solver.mjs",
     "solve": "node scripts/solve.mjs",
     "test": "node --test tests/*.test.mjs",
     "test:solver": "node scripts/test-solver.mjs",
-    "test:ui": "node --test tests/lms-browser.mjs"
+    "test:ui": "node --test --test-concurrency=1 tests/lms-browser.mjs tests/calendar-browser.mjs"
   },
   "engines": {
     "node": ">=20.18.1"
+  },
+  "dependencies": {
+    "fullcalendar": "7.1.4"
   }
 }
