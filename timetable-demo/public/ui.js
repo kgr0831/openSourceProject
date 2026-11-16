@@ -1,5 +1,5 @@
 import {assets} from './design-assets.js';
-import {timeText} from './planner-core.mjs';
+import {sectionLocation, timeText} from './planner-core.mjs';
 
 export const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const icon=(screen,name)=>`<img class="icon" src="${assets[screen][name]}" alt="" aria-hidden="true">`;
@@ -14,7 +14,7 @@ export const footer=(content,hint='')=>`<footer class="action-footer">${hint?`<p
 export const dayNames=['월','화','수','목','금'];
 const colors=['sage','lavender','blue','peach','sand'];
 const courseColor=id=>({ds:'sage',algo:'lavender',db:'blue',media:'sand',bible:'peach'})[id]||colors[Array.from(id).reduce((sum,c)=>sum+c.charCodeAt(0),0)%colors.length];
-export function timetable(candidate,action='section'){
+export function timetable(candidate,action='section',{fullDetails=false}={}){
   if(!candidate?.sections?.length)return '';
   const meetings=candidate.sections.flatMap(s=>s.meetings);
   const start=Math.min(600,Math.floor(Math.min(...meetings.map(m=>m[1]))/60)*60);
@@ -22,8 +22,12 @@ export function timetable(candidate,action='section'){
   const labels=Array.from({length:hours},(_,i)=>`<span class="hour" data-offset="${i/hours*100}">${start/60+i}</span>`).join('');
   const rows=Array.from({length:hours},(_,i)=>`<span class="hour-line" data-offset="${i/hours*100}"></span>`).join('');
   const columns=dayNames.map((_,day)=>`<div class="day-column">${candidate.sections.map(s=>s.meetings.filter(m=>m[0]===day).map(([,from,to])=>{
-    const label=`${s.name}, ${dayNames[day]} ${timeText(from)}–${timeText(to)}, ${s.building}`;
-    return `<button class="class-block ${courseColor(s.courseId)} ${to-from<90?'short-class':''}" data-action="${action}" data-id="${esc(s.courseId)}" data-offset="${(from-start)/(end-start)*100}" data-length="${(to-from)/(end-start)*100}" aria-label="${esc(label)}" title="${esc(label)}"><strong>${esc(s.shortName||s.name)}</strong><span class="class-detail">${timeText(from)}<br>${esc(s.building)}</span></button>`;
+    const location=fullDetails?sectionLocation(s):s.building;
+    const time=timeText(from)+'–'+timeText(to);
+    const label=[s.name,dayNames[day]+' '+time,location].filter(Boolean).join(', ');
+    const details=fullDetails?'<span class="class-detail"><span>'+time+'</span><span>'+esc(location)+'</span></span>':
+      '<span class="class-detail">'+timeText(from)+'<br>'+esc(s.building)+'</span>';
+    return `<button class="class-block ${courseColor(s.courseId)} ${to-from<90?'short-class':''}" data-action="${action}" data-id="${esc(s.courseId)}" data-offset="${(from-start)/(end-start)*100}" data-length="${(to-from)/(end-start)*100}" aria-label="${esc(label)}" title="${esc(label)}"><strong>${esc(fullDetails?s.name:s.shortName||s.name)}</strong>${details}</button>`;
   }).join('')).join('')}</div>`).join('');
   return `<div class="timetable" data-hours="${hours}" aria-label="주간 시간표"><div class="week-header"><span></span>${dayNames.map(d=>`<span>${d}</span>`).join('')}</div><div class="week-body"><div class="time-labels">${labels}</div><div class="schedule-grid">${rows}<div class="day-columns">${columns}</div></div></div></div>`;
 }

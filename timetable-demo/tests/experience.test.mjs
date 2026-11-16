@@ -36,7 +36,7 @@ test('비교안은 실제 후보 중 등교일·하루 수업량·공강 기준�
   assert.equal(compareOptions(input.slice(0,1)).length,1);assert.deepEqual(compareOptions([]),[]);
 });
 
-test('기존 저장 형식과 수강 기록을 유지하고 저장 실패 시 메모리도 보존',()=>{
+test('수강 기록을 유지하고 저장 실패 시 메모리도 보존',()=>{
   const original={...emptyPlanner(),experiences:[{id:'note',title:'기존 기록',body:'보존할 이유',courseNames:['자료구조']}]};
   let raw=JSON.stringify(original),fail=false;
   const store=createPlannerStore({getItem:key=>{assert.equal(key,storageKey);return raw},setItem:(key,value)=>{assert.equal(key,storageKey);if(fail)throw Error('QuotaExceededError');raw=value}});

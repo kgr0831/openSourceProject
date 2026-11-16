@@ -42,5 +42,5 @@ test('날짜·기간·시간 검증과 윤년 계산',()=>{
 });
 test('브라우저 기록을 복원하고 잘못된 버전과 중복 일정을 거절한다',()=>{
   const data={...emptyPlanner(),semester:{start,end,candidate},events:events()};assert.deepEqual(restorePlanner(JSON.parse(JSON.stringify(data))),data);
-  assert.throws(()=>restorePlanner({...data,version:2}));assert.throws(()=>restorePlanner({...data,events:[data.events[0],data.events[0]]}));assert.throws(()=>restorePlanner({...data,semester:null}));
+  assert.throws(()=>restorePlanner({...data,version:999}));assert.throws(()=>restorePlanner({...data,events:[data.events[0],data.events[0]]}));assert.throws(()=>restorePlanner({...data,semester:null}));
 });

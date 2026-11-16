@@ -34,6 +34,30 @@ test('legacy completed history does not exclude courses or block semester saving
   const candidate={sections:[{courseId:'ml',name:'머신러닝',id:'ml-01',meetings:[[0,600,660]],building:'',credits:3}]};
   store.setSemester(candidate,'2025-03-01','2025-06-20');assert.deepEqual(store.data.courseHistory,legacy.courseHistory);
 });
+
+test('career lists survive calendar migration, edits and undo without accepting stale previews',async()=>{
+  const list=await evaluateCareer({goal:'컴퓨터비전'},bridge),mem=storage(),initial=createPlannerStore(mem);
+  const candidate={sections:[{courseId:'ml',name:'머신러닝',id:'ml-01',meetings:[[0,600,660]],building:'정보과학관',credits:3}]};
+  initial.setSemester(candidate,'2026-11-09','2026-12-06');
+  const legacy={...structuredClone(initial.data),version:1,careerRecommendations:list};
+  delete legacy.revision;delete legacy.history;
+  const original=JSON.stringify(legacy);mem.setItem(storageKey,original);
+  const store=createPlannerStore(mem);
+  assert.equal(store.readError,'');assert.equal(store.data.version,2);
+  assert.deepEqual(store.data.careerRecommendations,list);assert.equal(mem.getItem(storageKey),original);
+  const events=structuredClone(store.data.events),semester=structuredClone(store.data.semester),id=events[0].id;
+  const pending=store.preview({type:'edit',id,patch:{location:'진리관'}});
+  assert.equal(pending.ok,true);
+  const updated={...list,goal:'컴퓨터비전 연구원'};store.saveCareerList(updated);
+  assert.deepEqual(store.data.events,events);assert.deepEqual(store.data.semester,semester);
+  assert.throws(()=>store.apply(pending),error=>error.code==='STALE_PREVIEW');
+  store.changeEvent(id,{location:'진리관'});
+  assert.equal(store.data.events.find(event=>event.id===id).location,'진리관');
+  assert.deepEqual(store.data.careerRecommendations,updated);
+  store.apply(store.preview({type:'undo',operationId:store.data.history.at(-1).id}));
+  assert.deepEqual(store.data.events,events);assert.deepEqual(store.data.careerRecommendations,updated);
+  const restored=createPlannerStore(mem);assert.equal(restored.readError,'');assert.deepEqual(restored.data,store.data);
+});
 test('explicit selection toggles required only and does not give other recommendations priority',()=>{
   const initial={...raw(),excludedCourseIds:['ml']},selected=toggleRequiredCourse(initial,'ml');
   assert.deepEqual(initial.requiredCourseIds,[]);assert.deepEqual(selected.requiredCourseIds,['ml']);assert.deepEqual(selected.excludedCourseIds,[]);
