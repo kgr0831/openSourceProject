@@ -38,33 +38,65 @@ export function validateEvent(event) {
 }
 export function createSemesterEvents(candidate,start,end) {
   validatePeriod(start,end);
-  if(!candidate?.sections?.length||candidate.sections.length>30)throw new Error('먼저 추천 시간표를 선택해 주세요.');
+  const duration=daysBetween(start,end);
+  if(!Array.isArray(candidate?.sections)||!candidate.sections.length||candidate.sections.length>30)throw new Error('먼저 추천 시간표를 선택해 주세요.');
+  const sections=new Set(),courses=new Set();
+  for(const section of candidate.sections){
+    const {id,courseId,name,building,room,meetings}=section||{};
+    if(typeof id!=='string'||!id.trim()||id.length>120||id.includes(':')||sections.has(id)||
+      typeof courseId!=='string'||!courseId.trim()||courseId.length>120||courses.has(courseId)||
+      !Array.isArray(meetings)||!meetings.length||
+      [building,room].some(part=>part!==undefined&&typeof part!=='string'))throw new Error('시간표의 과목과 분반을 확인해 주세요.');
+    sections.add(id);courses.add(courseId);
+    const slots=new Set();
+    for(const meeting of meetings){
+      if(!Array.isArray(meeting)||meeting.length!==3||!Number.isInteger(meeting[0])||meeting[0]<0||meeting[0]>6||slots.has(meeting.join(',')))throw new Error('분반의 요일과 시간 블록을 확인해 주세요.');
+      slots.add(meeting.join(','));
+      validateEvent({id,date:start,start:meeting[1],end:meeting[2],title:name,location:sectionLocation(section),kind:'class',status:'active'});
+    }
+  }
   const events=[];
-  for(let date=start;date<=end;date=addDays(date,1)) {
+  for(let offset=0;offset<=duration;offset++) {
+    const date=addDays(start,offset);
     const day=(parseDate(date).getUTCDay()+6)%7;
     for(const section of candidate.sections)for(const [index,[meetingDay,from,to]] of section.meetings.entries()) {
       if(day!==meetingDay)continue;
-      const original={date,start:from,end:to,title:section.name,location:section.building,kind:'class'};
-      events.push(validateEvent({...original,id:`${section.id}:${date}:${index}`,seriesId:`${section.id}:${index}`,courseId:section.courseId,original,status:'active'}));
+      const base={date,start:from,end:to,title:section.name,location:sectionLocation(section),kind:'class'};
+      const original={...base,
+        ...(section.building===undefined?{}:{building:section.building}),...(section.room===undefined?{}:{room:section.room})};
+      if(events.length>=2000)throw new Error('저장 가능한 일정 수를 초과했어요.');
+      events.push({...base,id:`${section.id}:${date}:${index}`,seriesId:`${section.id}:${index}`,sectionId:section.id,courseId:section.courseId,original,status:'active'});
     }
   }
   if(!events.length)throw new Error('선택한 기간에 수업이 없어요. 학기 시작일과 종료일을 확인해 주세요.');
   return events;
 }
-export function editEvents(events,id,patch,{scope='one',action='edit',period}={}) {
+export function sectionLocation({building,room}){return [building,room].filter(Boolean).join(' ')}
+const editableFields=['title','date','start','end','location','kind'];
+export function editEvents(events,id,patch,{scope='one',action='edit',period,skipIds=new Set(),useOriginalDates=false}={}) {
   const target=events.find(event=>event.id===id);
   if(!target)throw new Error('수정할 일정을 찾지 못했어요.');
-  if(!['one','future'].includes(scope)||!['edit','cancel','restore'].includes(action))throw new Error('일정 변경 방식을 확인해 주세요.');
+  if(!['one','future'].includes(scope)||!['edit','cancel','resume','restore'].includes(action))throw new Error('일정 변경 방식을 확인해 주세요.');
   if(scope==='future'&&!target.seriesId)throw new Error('반복 수업에만 이후 일정 변경을 적용할 수 있어요.');
   if(action==='restore'&&!target.original&&target.status!=='cancelled')throw new Error('취소된 일정을 선택해 주세요.');
-  const shift=action==='edit'?daysBetween(target.date,patch.date):0;
+  const fields=action==='edit'?Object.fromEntries(editableFields.filter(field=>Object.hasOwn(patch,field)).map(field=>[field,patch[field]])):{};
+  const dateChanged=Object.hasOwn(fields,'date');
+  const baseDate=event=>useOriginalDates?event.original.date:event.date;
+  const shift=dateChanged?daysBetween(baseDate(target),fields.date):0;
   const updated=events.map(event=>{
     const matches=event.id===id||(scope==='future'&&event.seriesId===target.seriesId&&event.original.date>=target.original.date);
-    if(!matches)return event;
+    if(!matches||skipIds.has(event.id))return event;
     let next;
-    if(action==='restore')next={...event,...(event.original||{}),status:'active'};
+    if(action==='restore'){
+      const baseline=event.original?Object.fromEntries(editableFields.map(field=>[field,event.original[field]])):{};
+      next={...event,...baseline,status:'active'};
+    }
     else if(action==='cancel')next={...event,status:'cancelled'};
-    else next={...event,title:patch.title.trim(),location:patch.location.trim(),kind:patch.kind,start:patch.start,end:patch.end,date:addDays(event.date,shift)};
+    else if(action==='resume')next={...event,status:'active'};
+    else{
+      next={...event,...fields,date:dateChanged?addDays(baseDate(event),shift):event.date};
+      for(const field of ['title','location'])if(typeof fields[field]==='string')next[field]=fields[field].trim();
+    }
     validateEvent(next);
     if(period&&(next.date<period.start||next.date>period.end))throw new Error('변경된 일정이 학기 기간을 벗어나요. 이번 일정만 변경하거나 학기 안의 날짜를 선택해 주세요.');
     return next;
@@ -112,9 +144,10 @@ export function exportCalendar(events,now=new Date()) {
   }
   lines.push('END:VCALENDAR');return lines.map(foldIcs).join('\r\n')+'\r\n';
 }
-export function emptyPlanner(){return {version:1,semester:null,events:[],experiences:[]}}
+export function emptyPlanner(){return {version:2,revision:0,semester:null,events:[],experiences:[],history:[]}}
 export function restorePlanner(value) {
-  if(!value||value.version!==1||!Array.isArray(value.events)||value.events.length>2000||!Array.isArray(value.experiences)||value.experiences.length>50)throw new Error('저장된 학기 기록을 읽지 못했어요.');
+  if(!value||![1,2].includes(value.version)||!Array.isArray(value.events)||value.events.length>2000||!Array.isArray(value.experiences)||value.experiences.length>50)throw new Error('저장된 학기 기록을 읽지 못했어요.');
+  if(value.version===2&&(!Number.isSafeInteger(value.revision)||value.revision<0||!Array.isArray(value.history)))throw new Error('저장된 변경 기록을 읽지 못했어요.');
   if(value.semester){validatePeriod(value.semester.start,value.semester.end);if(!value.semester.candidate?.sections?.length)throw new Error('저장된 시간표가 올바르지 않아요.')}
   else if(value.events.length)throw new Error('학기 없는 일정은 불러올 수 없어요.');
   const ids=new Set();
