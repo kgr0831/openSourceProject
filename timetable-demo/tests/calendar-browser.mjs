@@ -384,10 +384,17 @@ async function assertControlTargets(page, selector) {
 }
 
 async function assertSheetActions(page, viewportHeight) {
+  // Resizing schedules the visual viewport CSS update on the next animation frame.
+  await page.waitForFunction(() => {
+    const viewport = window.visualViewport;
+    const height = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--planner-visual-height'));
+    return !viewport || viewport.scale !== 1 || Math.abs(height - viewport.height) < 1;
+  });
   const buttons = [action(page, 'close-event'), action(page, 'save-event')];
   for (const button of buttons) {
     const box = await button.boundingBox();
-    assert.ok(box && box.height >= 43.5 && box.y >= 0 && box.y + box.height <= viewportHeight + 1);
+    assert.ok(box && box.height >= 43.5 && box.y >= 0 && box.y + box.height <= viewportHeight + 1,
+      JSON.stringify({box, viewportHeight}));
   }
   const fits = await editor(page).locator('.planner-dialog-body').evaluate(el => el.scrollHeight > el.clientHeight);
   assert.ok(fits, '짧은 화면에서는 입력 본문만 세로로 스크롤된다');

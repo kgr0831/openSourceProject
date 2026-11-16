@@ -1,3 +1,4 @@
+import {validateCareerList} from './career-model.mjs';
 import {emptyPlanner} from './planner-core.mjs';
 import {applyCalendar, loadCalendar, previewCalendar} from './calendar-logic.mjs';
 
@@ -51,6 +52,10 @@ export function createPlannerStore(storage) {
     apply,
     setSemester(candidate, start, end) {
       return run({type: 'initialize', candidate, start, end});
+    },
+    saveCareerList(list) {
+      validateCareerList(list);
+      return save({...data, revision: data.revision + 1, careerRecommendations: structuredClone(list)});
     },
     changeEvent(id, patch, {action, scope, ...options} = {}) {
       return run({type: 'edit', id, patch, ...(action ? {action} : {}), ...(scope ? {scope} : {})}, options);
