@@ -1,0 +1,3 @@
+# Preserve the supplied files byte for byte, including their source line endings.
+courses.json -text
+courses.csv -text whitespace=cr-at-eol

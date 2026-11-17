@@ -1,3 +1,4 @@
+import {scheduler} from './fixtures/schedule.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -24,7 +25,7 @@ function fixture() {
 }
 
 async function openCalendar(t, data = fixture(), {lms, engine = 'chromium', ...options} = {}) {
-  const server = createTimetableServer({port: 0, bridge: {close() {}}, createLms: async () => ({
+  const server = createTimetableServer({scheduler,port: 0, bridge: {close() {}}, createLms: async () => ({
     resume() {}, view: lms || (() => ({connection: 'disconnected'})), async close() {}
   })});
   await new Promise((resolve, reject) => server.once('error', reject).listen(0, '127.0.0.1', resolve));

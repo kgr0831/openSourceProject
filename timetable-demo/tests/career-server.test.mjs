@@ -1,11 +1,12 @@
+import {scheduler} from './fixtures/schedule.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createTimetableServer} from '../server.mjs';
-import {defaultRequest} from '../schedule.mjs';
+import {defaultRequest} from './fixtures/schedule.mjs';
 import {toggleRequiredCourse} from '../public/career-model.mjs';
 test('career list API remains independent; selected course enters actual solver as required',async t=>{
   const bridge={close(){},recommend:async payload=>({model:'test-double',data:{evaluations:payload.courses.map(c=>({courseId:c.courseId,relevance:c.courseId==='ml'?'high':'uncertain',reason:'과목명 기반 추천'}))}})};
-  const server=createTimetableServer({port:0,bridge});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const server=createTimetableServer({scheduler,port:0,bridge});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(async()=>{await server.closeServices();await new Promise(resolve=>server.close(resolve))});
   const base=`http://127.0.0.1:${server.address().port}`;
   const post=(route,body,extra={})=>fetch(base+'/api/'+route,{method:'POST',headers:{'Content-Type':'application/json','X-Timetable-App':'1',...extra},body:JSON.stringify(body)});

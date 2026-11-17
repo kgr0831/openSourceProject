@@ -606,7 +606,7 @@ textarea {
 
 .day-picker {
   display:grid;
-  grid-template-columns:repeat(5,1fr);
+  grid-template-columns:repeat(7,minmax(0,1fr));
   gap:8px;
 }
 
@@ -879,7 +879,7 @@ textarea {
 
 .week-header {
   display:grid;
-  grid-template-columns:var(--gutter) repeat(5,minmax(0,1fr));
+  grid-template-columns:var(--gutter) repeat(var(--days,5),minmax(0,1fr));
   height:36px;
   align-items:center;
   text-align:center;
@@ -924,7 +924,7 @@ textarea {
 
 .day-columns {
   display:grid;
-  grid-template-columns:repeat(5,minmax(0,1fr));
+  grid-template-columns:repeat(var(--days,5),minmax(0,1fr));
   position:absolute;
   inset:0;
 }
@@ -2050,3 +2050,8 @@ dialog[open]::backdrop { animation:backdrop-enter .2s ease-out; }
   .career-list-actions .button,.home-primary-actions .button { font-size:13px; padding:12px 8px; }
   .home-primary-actions .button-arrow { display:none; }
 }
+.catalog-controls{padding:16px;border:1px solid var(--line,#dce3e8);border-radius:16px;background:#f6f8fb;margin:16px 0}
+.catalog-selectors{display:grid;grid-template-columns:minmax(100px,1fr) minmax(0,2fr);gap:12px}
+.catalog-selectors .field{min-width:0;margin:0}.catalog-selectors select{width:100%;min-width:0}
+.catalog-count{font-size:14px;margin:10px 0 4px}.catalog-controls small{display:block;line-height:1.6}
+.course-card:disabled{opacity:.6;cursor:default}

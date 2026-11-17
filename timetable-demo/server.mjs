@@ -4,8 +4,7 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {CodexBridge,openBrowser} from './codex.mjs';
-import {courses,defaultRequest,generateCandidates,validateRequest,validateAiResult,outputSchema,applyIntent,intentSchema} from './schedule.mjs';
-import {catalogInfo} from './catalog.mjs';
+import * as liveScheduler from './schedule.mjs';
 import {ortoolsProvider} from './ortools-provider.mjs';
 import {friendlyError} from '../lms-parser/errors.mjs';
 
@@ -16,8 +15,9 @@ function reply(res,status,data,type='application/json; charset=utf-8'){
 }
 async function readJson(req){
   if(!req.headers['content-type']?.startsWith('application/json'))throw new Error('요청 형식이 올바르지 않습니다.');
-  let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>8192)throw new Error('입력이 너무 깁니다.')}
-  try{return JSON.parse(body)}catch{throw new Error('입력을 확인해 주세요.')}
+  const chunks=[];let bytes=0;
+  for await(const chunk of req){bytes+=chunk.length;if(bytes>65536)throw new Error('입력이 너무 깁니다.');chunks.push(chunk)}
+  try{return JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{throw new Error('입력을 확인해 주세요.')}
 }
 const files={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/planner.js':['planner.js','text/javascript; charset=utf-8'],'/planner-core.mjs':['planner-core.mjs','text/javascript; charset=utf-8'],'/lms.js':['lms.js','text/javascript; charset=utf-8'],'/lms-calendar.mjs':['lms-calendar.mjs','text/javascript; charset=utf-8']};
 files['/ui.js']=['ui.js','text/javascript; charset=utf-8'];
@@ -33,7 +33,8 @@ const calendarAssets=new Map([
   ['calendar.js','all/global.js'], ['theme.js','themes/monarch/global.js'], ['ko.js','locales/ko/global.js'],
   ['skeleton.css','skeleton.css'], ['theme.css','themes/monarch/theme.css'], ['palette.css','themes/monarch/palettes/blue.css']
 ]);
-export function createTimetableServer({port=4317,bridge=new CodexBridge(),createLms=async()=>new (await import('./lms-service.mjs')).LmsCalendarService()}={}) {
+export function createTimetableServer({port=4317,bridge=new CodexBridge(),scheduler=liveScheduler,createLms=async()=>new (await import('./lms-service.mjs')).LmsCalendarService()}={}) {
+const {defaultRequest,getCourses,catalogInfo,generateCandidates,validateRequest,validateAiResult,outputSchema,applyIntent,intentSchema}=scheduler;
 let recommendationBusy=false,lmsPromise=null,lms=null;
 async function getLms(){
   if(!lmsPromise)lmsPromise=Promise.resolve().then(createLms).then(app=>{lms=app;app.resume();return app}).catch(()=>{lmsPromise=null;throw new Error('LMS 구성 요소를 준비하지 못했어요. 시간표 데모 시작 파일을 다시 실행해 주세요.')});
@@ -63,7 +64,16 @@ const server=http.createServer(async(req,res)=>{
       catch(error){if(error.code==='ENOENT')return reply(res,404,{error:'파일을 찾을 수 없습니다.'});throw error}
     }
     if(req.method==='GET' && url.pathname==='/api/health')return reply(res,200,{app:'timetable-demo',version:'0.1.0',pid:process.pid});
-    if(req.method==='GET' && url.pathname==='/api/meta')return reply(res,200,{courses:courses.map(({sections,...course})=>course),defaultRequest,catalogInfo});
+    if(req.method==='GET' && url.pathname==='/api/meta'){
+      const scope={term:url.searchParams.get('term')??defaultRequest.term,department:url.searchParams.get('department')??defaultRequest.department};
+      const selected=getCourses(scope);
+      return reply(res,200,{courses:selected.map(({sections,...course})=>({...course,
+        sectionCount:sections.length,availableSectionCount:sections.filter(section=>section.meetings.length).length})),
+        defaultRequest:{...defaultRequest,...scope},catalogInfo:{...catalogInfo,...scope,
+          majorCount:selected.filter(course=>course.kind==='major').length,generalCount:selected.filter(course=>course.kind==='general').length,
+          selectedCourseCount:selected.length,selectedSectionCount:selected.reduce((count,course)=>count+course.sections.length,0),
+          selectedUnavailableSectionCount:selected.reduce((count,course)=>count+course.sections.filter(section=>!section.meetings.length).length,0)}});
+    }
     if(req.method==='GET' && url.pathname==='/api/lms/state')return reply(res,200,(await getLms()).view());
     if(req.method==='GET' && url.pathname==='/api/status')return reply(res,200,{...await bridge.status(),busy:recommendationBusy||bridge.busy});
     if(req.method!=='POST')return reply(res,404,{error:'페이지를 찾을 수 없습니다.'});
@@ -82,7 +92,7 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==='/api/career'){
       if(recommendationBusy||bridge.busy)throw new Error('추천을 생성 중입니다. 잠시 기다려 주세요.');
       recommendationBusy=true;
-      try{return reply(res,200,await evaluateCareer(body,bridge))}finally{recommendationBusy=false}
+      try{return reply(res,200,await evaluateCareer(body,bridge,scheduler))}finally{recommendationBusy=false}
     }
     if(url.pathname==='/api/connect')return reply(res,200,await bridge.connect());
     if(url.pathname==='/api/cancel')return reply(res,200,await bridge.cancelLogin());
@@ -96,7 +106,7 @@ const server=http.createServer(async(req,res)=>{
       try{
         let request=validateRequest(body),interpretation=null;
         if(request.note){
-          const intent=await bridge.recommend({task:'요청을 수업 요일·시간·학점·과목 조건으로 해석해 주세요. 명시되지 않은 값은 null. 해석 불가능한 요청은 unsupported에 표시.',currentSettings:request,note:request.note,catalog:courses.map(({sections,...course})=>course)},intentSchema,{mode:'interpret'});
+          const intent=await bridge.recommend({task:'요청을 수업 요일·시간·학점·과목 조건으로 해석해 주세요. 명시되지 않은 값은 null. 해석 불가능한 요청은 unsupported에 표시.',currentSettings:request,note:request.note,catalog:getCourses(request).map(({sections,...course})=>course)},intentSchema,{mode:'interpret'});
           ({request,interpretation}=applyIntent(request,intent.data));
         }
         const result=await generateCandidates(request,{signal:controller.signal}),candidates=result.candidates;

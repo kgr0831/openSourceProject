@@ -1,4 +1,4 @@
-import {courses} from './schedule.mjs';
+import * as liveScheduler from './schedule.mjs';
 export const careerSchema={type:'object',additionalProperties:false,properties:{evaluations:{type:'array',items:{type:'object',additionalProperties:false,properties:{courseId:{type:'string'},relevance:{type:'string',enum:['high','medium','uncertain']},reason:{type:'string'}},required:['courseId','relevance','reason']}}},required:['evaluations']};
 export function validateEvaluations(raw,eligible){
   if(!Array.isArray(raw?.evaluations)||raw.evaluations.length!==eligible.length)throw new Error('진로 추천 응답의 과목 수를 확인하지 못했습니다. 다시 시도해 주세요.');
@@ -8,11 +8,12 @@ export function validateEvaluations(raw,eligible){
     seen.add(e.courseId);return {courseId:e.courseId,relevance:e.relevance,reason:e.reason.trim()};
   });
 }
-export async function evaluateCareer(body,bridge){
+export async function evaluateCareer(body,bridge,scheduler=liveScheduler){
   if(typeof body?.goal!=='string'||!body.goal.trim()||body.goal.length>400)throw new Error('희망 진로를 1~400자로 입력해 주세요.');
-  const eligible=courses;
+  const term=body.term??scheduler.defaultRequest.term,department=body.department??scheduler.defaultRequest.department;
+  const eligible=scheduler.getCourses({term,department});
   // Do not send history, private notes, timetable events or other student data to the model.
-  const ai=await bridge.recommend({goal:body.goal.trim(),department:'AI소프트웨어학부',courses:eligible.map(c=>({courseId:c.id,name:c.name}))},careerSchema,{mode:'career'});
+  const ai=await bridge.recommend({goal:body.goal.trim(),department,courses:eligible.map(c=>({courseId:c.id,name:c.name}))},careerSchema,{mode:'career'});
   const evaluations=validateEvaluations(ai.data,eligible);
-  return {evaluations,goal:body.goal.trim(),source:'course-name-ai',model:ai.model||'Codex',notice:'과목명 기반 추천입니다. 실제 수업 내용·수강 자격을 보장하지 않습니다. 현재 분반·시간·강의실은 가상 데이터입니다.'};
+  return {evaluations,goal:body.goal.trim(),term,department,catalogVersion:scheduler.catalogVersion,source:'course-name-ai',model:ai.model||'Codex',notice:'선택한 학기·학과의 과목명 기반 추천입니다. 실제 수업 내용·수강 자격을 보장하지 않으며 수강대상과 개설 변경은 학교에서 확인해 주세요.'};
 }

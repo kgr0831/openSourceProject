@@ -37,7 +37,7 @@ def lunch_interval(events, lunch):
 
 
 def measured(sections, constraints, preferences):
-    by_day = {day: sorted([{**m, 'building': s['building']} for s in sections for m in s['meetings'] if m['day'] == day], key=lambda m: m['start']) for day in range(1, 8)}
+    by_day = {day: sorted([{**m, 'building': m.get('building', s['building'])} for s in sections for m in s['meetings'] if m['day'] == day], key=lambda m: m['start']) for day in range(1, 8)}
     days = [d for d, events in by_day.items() if events]
     cutoff = constraints.get('morning', {}).get('before_minute', 720) if constraints.get('morning') else 720
     result = {'attendance_days': len(days), 'day_list': days,
@@ -95,12 +95,15 @@ class Model:
             m.add(self.q[cid] == 0)
         for sid in c['locked_section_ids']:
             m.add(self.x[sid] == 1)
+        active_sections = []
         for s in self.sections:
-            if (s['section_id'] in c['excluded_section_ids'] or s['term'] != request['term'] or
+            if (s['section_id'] in c['excluded_section_ids'] or s['course_id'] in c['excluded_course_ids'] or s['term'] != request['term'] or
                 any(e['day'] not in c['allowed_weekdays'] or e['start'] < c['earliest_start'] or e['end'] > c['latest_end'] for e in s['meetings'])):
                 m.add(self.x[s['section_id']] == 0)
-        for i, a in enumerate(self.sections):
-            for b in self.sections[i+1:]:
+            else:
+                active_sections.append(s)
+        for i, a in enumerate(active_sections):
+            for b in active_sections[i+1:]:
                 if a['course_id'] == b['course_id'] or any(overlaps(x, y) for x in a['meetings'] for y in b['meetings']):
                     m.add(self.x[a['section_id']] + self.x[b['section_id']] <= 1)
         for group in {s['group'] for s in self.sections if s['group']}:
@@ -114,7 +117,7 @@ class Model:
             m.add(self.credit == int(number(target) * scale))
         if 'protected_total_credits' in c:
             m.add(self.credit == int(number(c['protected_total_credits']) * scale))
-        self.by_day = {day: sorted([{**e, 'sid': s['section_id'], 'building': s['building']} for s in self.sections for e in s['meetings'] if e['day'] == day], key=lambda e: (e['start'], e['end'], e['sid'])) for day in range(1, 8)}
+        self.by_day = {day: sorted([{**e, 'sid': s['section_id'], 'building': e.get('building', s['building'])} for s in active_sections for e in s['meetings'] if e['day'] == day], key=lambda e: (e['start'], e['end'], e['sid'])) for day in range(1, 8)}
         self.y, teachings, gaps, last_ends, counts, mornings = {}, [], [], [], [], []
         cutoff = c['morning']['before_minute'] if c.get('morning') else 720
         morning_count = 0
@@ -256,17 +259,39 @@ class Model:
                 m.add(missed == 0).only_enforce_if(self.y[day].Not())
                 cost += 500 * missed
             if p['travel'] or p['breaks']:
-                for i, a in enumerate(blocks):
-                    for j in range(i + 1, len(blocks)):
-                        b = blocks[j]
-                        penalty = 80 * p['travel'] * (a['building'] != b['building']) + 180 * p['breaks'] * (b['start'] - a['end'] < 30)
-                        if a['end'] > b['start'] or not penalty:
-                            continue
-                        adjacent = m.new_bool_var('adjacent')
-                        terms = [self.x[a['sid']], self.x[b['sid']], *[self.x[e['sid']].Not() for e in blocks[i+1:j]]]
-                        m.add_bool_and(terms).only_enforce_if(adjacent)
-                        m.add_bool_or([term.Not() for term in terms]).only_enforce_if(adjacent.Not())
-                        cost += penalty * adjacent
+                # Carry the last selected block through chronological order. This
+                # counts consecutive selected meetings without a cubic list of
+                # all pairs and every potentially intervening section.
+                buildings = {name: index + 1 for index, name in enumerate(sorted({e['building'] for e in blocks}))}
+                previous_building, previous_end, has_previous = 0, 0, 0
+                for block in blocks:
+                    selected = self.x[block['sid']]
+                    if p['travel']:
+                        building = buildings[block['building']]
+                        changed = m.new_bool_var('building_changed')
+                        m.add(previous_building != building).only_enforce_if(changed)
+                        m.add(previous_building == building).only_enforce_if(changed.Not())
+                        charged = m.new_bool_var('charge_building_change')
+                        m.add_min_equality(charged, [selected, has_previous, changed])
+                        cost += 80 * charged
+                        next_building = m.new_int_var(0, len(buildings), 'last_selected_building')
+                        m.add(next_building == building).only_enforce_if(selected)
+                        m.add(next_building == previous_building).only_enforce_if(selected.Not())
+                        previous_building = next_building
+                    if p['breaks']:
+                        close = m.new_bool_var('short_break')
+                        m.add(previous_end > block['start'] - 30).only_enforce_if(close)
+                        m.add(previous_end <= block['start'] - 30).only_enforce_if(close.Not())
+                        charged = m.new_bool_var('charge_short_break')
+                        m.add_min_equality(charged, [selected, has_previous, close])
+                        cost += 180 * charged
+                        next_end = m.new_int_var(0, 1440, 'last_selected_end')
+                        m.add(next_end == block['end']).only_enforce_if(selected)
+                        m.add(next_end == previous_end).only_enforce_if(selected.Not())
+                        previous_end = next_end
+                    next_present = m.new_bool_var('has_previous_meeting')
+                    m.add_max_equality(next_present, [has_previous, selected])
+                    has_previous = next_present
         self.metrics['legacy_cost_units'] = cost
 
     def exclude(self, selected):

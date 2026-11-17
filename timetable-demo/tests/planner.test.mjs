@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {courses,defaultRequest,generateCandidates} from '../schedule.mjs';
+import {courses,defaultRequest,generateCandidates} from './fixtures/schedule.mjs';
 import {createSemesterEvents,editEvents,conflictPairs,exportCalendar,careerSelection,parseDate,addDays,emptyPlanner,restorePlanner,timeValue} from '../public/planner-core.mjs';
 const candidate={sections:[{id:'db-02',courseId:'db',name:'데이터베이스',building:'정보과학관',meetings:[[0,540,630],[2,540,630]]}]};
 const start='2026-10-19',end='2026-11-01';

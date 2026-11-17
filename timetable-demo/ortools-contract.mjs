@@ -31,7 +31,7 @@ export function solverMetrics(sections,constraints,preferences,scale){
   const out={attendance_days:0,day_list:[],total_gap_minutes:0,latest_end:0,max_daily_teaching_minutes:0,morning_meeting_count:0,morning_day_count:0,friday_classes:0,building_changes:0,max_daily_courses:0,lunch_missed_days:0,back_to_back_classes:0,legacy_morning_count:0};
   const lunches=[];
   for(let day=1;day<=7;day++){
-    const events=sections.flatMap(s=>s.meetings.filter(e=>e.day===day).map(e=>({...e,building:s.building||''}))).sort((a,b)=>a.start-b.start);
+    const events=sections.flatMap(s=>s.meetings.filter(e=>e.day===day).map(e=>({...e,building:e.building??s.building??''}))).sort((a,b)=>a.start-b.start);
     if(!events.length)continue;
     out.attendance_days++;out.day_list.push(day);
     const teaching=sum(events,e=>e.end-e.start),cutoff=constraints.morning?.before_minute??720;

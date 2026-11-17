@@ -1,3 +1,4 @@
+import {scheduler} from './fixtures/schedule.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -19,7 +20,7 @@ test('진로 추천 저장·필수 선택·재검색 실패와 기존 캘린더 
       reason: '과목명 기반 테스트 추천'
     }))}};
   }};
-  const server = createTimetableServer({port: 0, bridge, createLms: async () => ({
+  const server = createTimetableServer({scheduler,port: 0, bridge, createLms: async () => ({
     resume() {}, view: () => ({connection: 'disconnected'}), async close() {}
   })});
   await new Promise((resolve, reject) => server.once('error', reject).listen(0, '127.0.0.1', resolve));

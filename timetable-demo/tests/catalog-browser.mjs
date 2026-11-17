@@ -1,0 +1,98 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
+import {mkdir} from 'node:fs/promises';
+import {createTimetableServer} from '../server.mjs';
+import {getCourses,catalogInfo,courses} from '../catalog.mjs';
+import {createPlannerStore,storageKey} from '../public/planner.js';
+
+const {chromium}=createRequire(new URL('../../lms-parser/package.json',import.meta.url))('playwright');
+
+test('실제 강좌를 학기·학과로 선택하고 추천·저장·복원하며 토요일과 모바일을 표시한다',{timeout:90000},async t=>{
+  let careerPayload;
+  const server=createTimetableServer({port:0,bridge:{close(){},async recommend(payload){
+    careerPayload=payload;
+    return {model:'test',data:{evaluations:payload.courses.map((c,index)=>({courseId:c.courseId,relevance:index===0?'high':'uncertain',reason:'과목명 기반 테스트'}))}};
+  }},createLms:async()=>({resume(){},view:()=>({connection:'disconnected'}),async close(){}})});
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  t.after(async()=>{await server.closeServices();await new Promise(resolve=>server.close(resolve))});
+  const url='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({channel:'chrome',headless:true});t.after(()=>browser.close());
+  const page=await browser.newPage({viewport:{width:1440,height:1050},reducedMotion:'reduce'}),errors=[];
+  page.setDefaultTimeout(15000);page.on('pageerror',error=>errors.push(error.message));
+  const navigate=async route=>{await page.evaluate(route=>{location.hash=route},route);await page.locator('main[data-route="'+route+'"]').waitFor()};
+  const change=async(id,value)=>{
+    const response=page.waitForResponse(r=>r.url().includes('/api/meta?'));
+    await page.locator('#'+id).selectOption(value);assert.equal((await response).status(),200);
+    await page.waitForFunction(id=>!document.getElementById(id)?.disabled,id);
+  };
+  const saved=()=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
+  await page.goto(url+'/#courses');
+  await page.locator('#catalog-term').waitFor();
+  assert.equal(await page.locator('#catalog-term').inputValue(),'2026-2');
+  assert.equal(await page.locator('#catalog-department option').count(),59);
+  await page.locator('[data-action="course"]:enabled').first().click();
+  await change('catalog-term','2026-1');
+  assert.equal(await page.locator('[data-action="course"][aria-pressed="true"]').count(),0);
+  await change('catalog-department','경영학부');
+  await page.locator('[data-action="course-kind"][data-value="all"]').click();
+  await page.locator('[data-action="more-courses"]').click();
+  assert.equal(await page.locator('[data-action="course"]').count(),getCourses({term:'2026-1',department:'경영학부'}).length);
+  const unavailable=getCourses({term:'2026-1',department:'경영학부'}).find(c=>c.availableSectionCount===0);
+  assert.equal(await page.locator('[data-action="course"][data-id="'+unavailable.id+'"]').isDisabled(),true);
+  await navigate('career');await page.locator('#career-goal').fill('회계사');
+  await page.locator('[data-action="career-evaluate"]').click();
+  await page.locator('main[data-route="career-list"]').waitFor();
+  assert.equal(careerPayload.department,'경영학부');assert.ok(careerPayload.courses.every(c=>c.courseId.startsWith('ssu-2026-1-')));
+  const career=(await saved()).careerRecommendations;
+  await page.reload();await page.locator('#catalog-term').waitFor();
+  assert.equal(await page.locator('#catalog-term').inputValue(),'2026-1');
+  assert.equal(await page.locator('#catalog-department').inputValue(),'경영학부');
+  assert.ok((await page.locator('main .heading p').innerText()).includes('회계사'));
+  await change('catalog-term','2026-2');await change('catalog-department',catalogInfo.department);
+  assert.equal(await page.locator('.career-columns').count(),0);
+  assert.deepEqual((await saved()).careerRecommendations,career);
+  await navigate('courses');
+  const algorithm=getCourses().find(c=>c.name==='알고리즘');assert.ok(algorithm);
+  await page.locator('#course-search').fill(algorithm.name);
+  await page.locator('[data-action="course"][data-id="'+algorithm.id+'"]').click();
+  await page.locator('main a[href="#preferences"]').click();
+  assert.equal(await page.locator('[data-day]').count(),7);
+  await page.locator('[data-action="recommend"]').click();
+  await page.locator('main[data-route="results"]').waitFor({timeout:30000});
+  await page.locator('[data-action="confirm"]:visible').click();
+  await page.locator('#semester-form button[type="submit"]').click();
+  await page.locator('main[data-route="saved"]').waitFor();
+  const planner=await saved();
+  assert.equal(planner.semester.candidate.credits,13);
+  assert.ok(planner.semester.candidate.sections.some(s=>s.courseId===algorithm.id));
+  assert.ok(planner.semester.candidate.sections.every(s=>s.term==='2026-2'));
+  for(const event of planner.events){
+    const section=planner.semester.candidate.sections.find(s=>s.id===event.sectionId);
+    assert.ok(section.locations.includes(event.location));
+  }
+  await page.locator('[data-action="section"][data-id="'+algorithm.id+'"]').first().click();
+  assert.ok((await page.locator('#dialog').innerText()).includes('수강대상'));
+  assert.ok((await page.locator('#dialog').innerText()).includes('과목번호'));
+  await page.locator('[data-action="close-dialog"]').click();
+  await mkdir(new URL('../.ui-qa/',import.meta.url),{recursive:true});
+  await page.screenshot({path:fileURLToPath(new URL('../.ui-qa/catalog-desktop.png',import.meta.url))});
+  await page.reload();await page.locator('main[data-route="saved"]').waitFor();
+  assert.deepEqual((await saved()).events,planner.events);
+  await page.setViewportSize({width:390,height:844});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await navigate('courses');await page.screenshot({path:fileURLToPath(new URL('../.ui-qa/catalog-mobile.png',import.meta.url))});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+
+  const saturday=courses.find(c=>c.sections.some(s=>s.meetings.some(m=>m[0]===5)));
+  const section=saturday.sections.find(s=>s.meetings.some(m=>m[0]===5));
+  const memory=new Map(),fixture=createPlannerStore({getItem:key=>memory.get(key)??null,setItem:(key,value)=>memory.set(key,value)});
+  fixture.setSemester({credits:saturday.credits,sections:[{...section,courseId:saturday.id,name:saturday.name,credits:saturday.credits}]},'2026-03-02','2026-03-15');
+  const weekend=await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});
+  await weekend.addInitScript(({key,data})=>localStorage.setItem(key,JSON.stringify(data)),{key:storageKey,data:fixture.data});
+  await weekend.goto(url+'/#saved');await weekend.locator('.timetable[data-days="6"]').waitFor();
+  assert.ok(await weekend.locator('.day-column').nth(5).locator('.class-block').count()>0);
+  assert.ok(await weekend.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  assert.deepEqual(errors,[]);
+});

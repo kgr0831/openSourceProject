@@ -55,8 +55,8 @@ def normalize(payload):
     if request.get('catalog_version') != catalog['version']:
         raise ValueError('요청의 데이터 버전이 카탈로그와 다릅니다.')
     raw = catalog.get('sections')
-    if not isinstance(raw, list) or len(raw) > 500:
-        raise ValueError('분반 데이터는 최대 500개까지 지원합니다.')
+    if not isinstance(raw, list) or len(raw) > 1000:
+        raise ValueError('분반 데이터는 최대 1000개까지 지원합니다.')
     raw_ids = [s.get('section_id') for s in raw if isinstance(s, dict) and isinstance(s.get('section_id'), str)]
     if len(raw_ids) != len(set(raw_ids)):
         raise ValueError('중복 분반 ID입니다.')
@@ -81,6 +81,8 @@ def normalize(payload):
                 integer(m.get('day'), 1, 7, '요일')
                 integer(m.get('start'), 0, 1439, '시작')
                 integer(m.get('end'), m['start'] + 1, 1440, '종료')
+                if not isinstance(m.get('building', ''), str):
+                    raise ValueError('수업별 건물 정보를 확인해 주세요.')
             if any(a['day'] == b['day'] and a['start'] < b['end'] and b['start'] < a['end'] for i, a in enumerate(meetings) for b in meetings[i+1:]):
                 raise ValueError('분반 내부의 수업 시간이 겹칩니다.')
             section.setdefault('kind', 'major')

@@ -50,10 +50,10 @@ export function createSemesterEvents(candidate,start,end) {
       [building,room].some(part=>part!==undefined&&typeof part!=='string'))throw new Error('시간표의 과목과 분반을 확인해 주세요.');
     sections.add(id);courses.add(courseId);
     const slots=new Set();
-    for(const meeting of meetings){
+    for(const [index,meeting] of meetings.entries()){
       if(!Array.isArray(meeting)||meeting.length!==3||!Number.isInteger(meeting[0])||meeting[0]<0||meeting[0]>6||slots.has(meeting.join(',')))throw new Error('분반의 요일과 시간 블록을 확인해 주세요.');
       slots.add(meeting.join(','));
-      validateEvent({id,date:start,start:meeting[1],end:meeting[2],title:name,location:sectionLocation(section),kind:'class',status:'active'});
+      validateEvent({id,date:start,start:meeting[1],end:meeting[2],title:name,location:sectionLocation(section,index),kind:'class',status:'active'});
     }
   }
   const events=[];
@@ -62,7 +62,7 @@ export function createSemesterEvents(candidate,start,end) {
     const day=(parseDate(date).getUTCDay()+6)%7;
     for(const section of candidate.sections)for(const [index,[meetingDay,from,to]] of section.meetings.entries()) {
       if(day!==meetingDay)continue;
-      const base={date,start:from,end:to,title:section.name,location:sectionLocation(section),kind:'class'};
+      const base={date,start:from,end:to,title:section.name,location:sectionLocation(section,index),kind:'class'};
       const original={...base,
         ...(section.building===undefined?{}:{building:section.building}),...(section.room===undefined?{}:{room:section.room})};
       if(events.length>=2000)throw new Error('저장 가능한 일정 수를 초과했어요.');
@@ -72,7 +72,7 @@ export function createSemesterEvents(candidate,start,end) {
   if(!events.length)throw new Error('선택한 기간에 수업이 없어요. 학기 시작일과 종료일을 확인해 주세요.');
   return events;
 }
-export function sectionLocation({building,room}){return [building,room].filter(Boolean).join(' ')}
+export function sectionLocation({building,room,location,locations},index){return locations?.[index]??location??[building,room].filter(Boolean).join(' ')}
 const editableFields=['title','date','start','end','location','kind'];
 export function editEvents(events,id,patch,{scope='one',action='edit',period,skipIds=new Set(),useOriginalDates=false}={}) {
   const target=events.find(event=>event.id===id);

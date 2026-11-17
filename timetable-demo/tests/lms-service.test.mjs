@@ -1,3 +1,4 @@
+import {scheduler} from './fixtures/schedule.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {LmsCalendarService} from '../lms-service.mjs';
@@ -43,7 +44,7 @@ test('수집 도중 계정이 바뀐 결과를 캘린더에 반영하지 않는�
 
 test('프로젝트 LMS 경로도 로컬 Host·Origin·앱 헤더를 검증하고 일반 추천은 독립적으로 동작한다',async t=>{
   const {app}=service();const bridge={status:async()=>({connected:false}),close(){}};
-  const server=createTimetableServer({port:0,bridge,createLms:async()=>app});
+  const server=createTimetableServer({scheduler,port:0,bridge,createLms:async()=>app});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(async()=>{await server.closeServices();await new Promise(resolve=>server.close(resolve))});
   const base=`http://127.0.0.1:${server.address().port}`;
@@ -62,7 +63,7 @@ test('프로젝트 LMS 경로도 로컬 Host·Origin·앱 헤더를 검증하고
 });
 
 test('LMS 구성 요소가 없더라도 기존 시간표 서버는 작동하고 오류는 안전한 안내로 바꾼다',async t=>{
-  const server=createTimetableServer({port:0,bridge:{close(){}},createLms:async()=>{throw new Error('sensitive synthetic diagnostic')}});
+  const server=createTimetableServer({scheduler,port:0,bridge:{close(){}},createLms:async()=>{throw new Error('sensitive synthetic diagnostic')}});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
   const base=`http://127.0.0.1:${server.address().port}`;
   const failure=await fetch(base+'/api/lms/state');assert.equal(failure.status,400);assert.doesNotMatch(await failure.text(),/sensitive/);

@@ -1,9 +1,10 @@
+import {scheduler} from './fixtures/schedule.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {groupCareerCourses,toggleRequiredCourse} from '../public/career-model.mjs';
 import {createPlannerStore,storageKey} from '../public/planner.js';
-import {defaultRequest,validateRequest,solverInput,generateCandidates,courses} from '../schedule.mjs';
-import {evaluateCareer,validateEvaluations} from '../career.mjs';
+import {defaultRequest,validateRequest,solverInput,generateCandidates,courses} from './fixtures/schedule.mjs';
+import {evaluateCareer as evaluateLiveCareer,validateEvaluations} from '../career.mjs';
 const raw=()=>structuredClone(defaultRequest);
 const bridge={recommend:async(payload,schema,options)=>{
   assert.equal(options.mode,'career');assert.deepEqual(Object.keys(payload).sort(),['courses','department','goal']);
@@ -79,3 +80,5 @@ test('actual solver includes explicit selection and respects normal user exclusi
   for(const c of result.candidates)assert.deepEqual(c.sections.map(s=>s.courseId),['ml']);
   assert.deepEqual(result.request.preferredCourseIds,[]);
 });
+
+function evaluateCareer(body,bridge){return evaluateLiveCareer(body,bridge,scheduler)}

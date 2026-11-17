@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {defaultRequest,generateCandidates,measure,validateRequest} from '../schedule.mjs';
+import {defaultRequest,generateCandidates,measure,validateRequest} from './fixtures/schedule.mjs';
 import {compareOptions} from '../public/ui.js';
 import {createPlannerStore,storageKey} from '../public/planner.js';
 import {emptyPlanner} from '../public/planner-core.mjs';

@@ -11,28 +11,29 @@ export const field=(label,input)=>`<label class="field"><span>${label}</span>${i
 export const toggle=(key,label,checked,description='')=>`<label class="toggle"><span>${label}${description?`<small>${description}</small>`:''}</span><input type="checkbox" data-pref="${key}" ${checked?'checked':''}><span class="switch" aria-hidden="true"></span></label>`;
 export const tabs=(items,active,action)=>`<div class="tabs" role="group" data-tabs="${action}">${items.map(([id,label])=>button(esc(label),action,'tab',`data-value="${esc(id)}" aria-pressed="${String(id)===String(active)}"`)).join('')}<span class="tab-indicator" aria-hidden="true"></span></div>`;
 export const footer=(content,hint='')=>`<footer class="action-footer">${hint?`<p>${hint}</p>`:''}${content}</footer>`;
-export const dayNames=['월','화','수','목','금'];
+export const dayNames=['월','화','수','목','금','토','일'];
 const colors=['sage','lavender','blue','peach','sand'];
 const courseColor=id=>({ds:'sage',algo:'lavender',db:'blue',media:'sand',bible:'peach'})[id]||colors[Array.from(id).reduce((sum,c)=>sum+c.charCodeAt(0),0)%colors.length];
 export function timetable(candidate,action='section',{fullDetails=false}={}){
   if(!candidate?.sections?.length)return '';
   const meetings=candidate.sections.flatMap(s=>s.meetings);
+  const shownDays=dayNames.slice(0,Math.max(5,...meetings.map(meeting=>meeting[0]+1)));
   const start=Math.min(600,Math.floor(Math.min(...meetings.map(m=>m[1]))/60)*60);
   const end=Math.max(1080,Math.ceil(Math.max(...meetings.map(m=>m[2]))/60)*60),hours=(end-start)/60;
   const labels=Array.from({length:hours},(_,i)=>`<span class="hour" data-offset="${i/hours*100}">${start/60+i}</span>`).join('');
   const rows=Array.from({length:hours},(_,i)=>`<span class="hour-line" data-offset="${i/hours*100}"></span>`).join('');
-  const columns=dayNames.map((_,day)=>`<div class="day-column">${candidate.sections.map(s=>s.meetings.filter(m=>m[0]===day).map(([,from,to])=>{
-    const location=fullDetails?sectionLocation(s):s.building;
+  const columns=shownDays.map((_,day)=>`<div class="day-column">${candidate.sections.map(s=>s.meetings.filter(m=>m[0]===day).map(meeting=>{
+    const [,from,to]=meeting,location=sectionLocation(s,s.meetings.indexOf(meeting));
     const time=timeText(from)+'–'+timeText(to);
     const label=[s.name,dayNames[day]+' '+time,location].filter(Boolean).join(', ');
     const details=fullDetails?'<span class="class-detail"><span>'+time+'</span><span>'+esc(location)+'</span></span>':
-      '<span class="class-detail">'+timeText(from)+'<br>'+esc(s.building)+'</span>';
+      '<span class="class-detail">'+timeText(from)+'<br>'+esc(location)+'</span>';
     return `<button class="class-block ${courseColor(s.courseId)} ${to-from<90?'short-class':''}" data-action="${action}" data-id="${esc(s.courseId)}" data-offset="${(from-start)/(end-start)*100}" data-length="${(to-from)/(end-start)*100}" aria-label="${esc(label)}" title="${esc(label)}"><strong>${esc(fullDetails?s.name:s.shortName||s.name)}</strong>${details}</button>`;
   }).join('')).join('')}</div>`).join('');
-  return `<div class="timetable" data-hours="${hours}" aria-label="주간 시간표"><div class="week-header"><span></span>${dayNames.map(d=>`<span>${d}</span>`).join('')}</div><div class="week-body"><div class="time-labels">${labels}</div><div class="schedule-grid">${rows}<div class="day-columns">${columns}</div></div></div></div>`;
+  return `<div class="timetable" data-hours="${hours}" data-days="${shownDays.length}" aria-label="주간 시간표"><div class="week-header"><span></span>${shownDays.map(d=>`<span>${d}</span>`).join('')}</div><div class="week-body"><div class="time-labels">${labels}</div><div class="schedule-grid">${rows}<div class="day-columns">${columns}</div></div></div></div>`;
 }
 export function layoutTimetables(){
-  document.querySelectorAll('.timetable').forEach(el=>el.style.setProperty('--hours',el.dataset.hours));
+  document.querySelectorAll('.timetable').forEach(el=>{el.style.setProperty('--hours',el.dataset.hours);el.style.setProperty('--days',el.dataset.days||5)});
   document.querySelectorAll('[data-offset]').forEach(el=>el.style.top=el.dataset.offset+'%');
   document.querySelectorAll('[data-length]').forEach(el=>el.style.height=`calc(${el.dataset.length}% - 4px)`);
 }

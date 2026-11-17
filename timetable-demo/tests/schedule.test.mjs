@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {courses,defaultRequest,generateCandidates,hasConflict,validateRequest,validateAiResult,applyIntent,intentSchema} from '../schedule.mjs';
+import {courses,defaultRequest,generateCandidates,hasConflict,validateRequest,validateAiResult,applyIntent,intentSchema} from './fixtures/schedule.mjs';
 const base=()=>structuredClone(defaultRequest);
 const exact=(total,major,general)=>({total:{min:total,max:total},major:{min:major,max:major},general:{min:general,max:general}});
 function verify(result){
@@ -65,7 +65,7 @@ test('모든 요일별 작은 시간표와 여러 학점 조합의 하드 조건
 });
 test('잘못된 요일·과목·범위·중복·긴 입력은 거절',()=>{
   assert.throws(()=>validateRequest({...base(),allowedDays:[]}));
-  assert.throws(()=>validateRequest({...base(),allowedDays:[5]}));
+  assert.throws(()=>validateRequest({...base(),allowedDays:[7]}));
   assert.throws(()=>validateRequest({...base(),requiredCourseIds:['fake']}));
   assert.throws(()=>validateRequest({...base(),requiredCourseIds:['db'],excludedCourseIds:['db']}));
   assert.throws(()=>validateRequest({...base(),credits:exact(-1,9,4)}));

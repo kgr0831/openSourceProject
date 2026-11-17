@@ -7,7 +7,7 @@ export function hardConditions(r){
   return field('추천 기준',select('ranking-profile',[['personalized','내 선호 함께 반영'],['compact','공강이 짧은 순'],['fewer_days','등교일이 적은 순'],['balanced','하루 수업량이 고른 순']],r.rankingProfile))+
     '<small>세부 선호는 ‘내 선호 함께 반영’에서 반영해요. 다른 기준은 해당 기준의 우선순위를 엄격하게 지켜요.</small>'+
     '<details class="disclosure"><summary>반드시 지킬 생활 조건</summary><div class="stack compact">'+
-    field('등교일 수',select('attendance-mode',[['','제한 없음'],['max','최대'],['exact','정확히']],attendance?.mode||'')+select('attendance-value',[1,2,3,4,5].map(n=>[n,n+'일']),attendance?.value??3))+
+    field('등교일 수',select('attendance-mode',[['','제한 없음'],['max','최대'],['exact','정확히']],attendance?.mode||'')+select('attendance-value',[1,2,3,4,5,6,7].map(n=>[n,n+'일']),attendance?.value??3))+
     field('오전 12시 이전 수업',select('morning-max',[['','제한 없음'],...[0,1,2,3,4,5,6].map(n=>[n,'최대 '+n])],morning?.max??'')+select('morning-unit',[['meeting','수업 횟수로 계산'],['day','수업이 있는 날로 계산']],morning?.unit||'meeting'))+
     '<label class="replace-confirm"><input id="hard-lunch" type="checkbox" '+(lunch.enabled?'checked':'')+'>점심시간을 반드시 확보하기</label>'+
     field('12시–14시 사이 연속 휴식',select('lunch-duration',[30,45,60,75,90].map(n=>[n,n+'분']),lunch.duration||60)+select('lunch-placement',[['within_window','점심 구간 안에서 확보'],['between_classes','앞뒤로 수업이 있는 사이']],lunch.placement||'within_window'))+
@@ -25,7 +25,7 @@ export function relaxationChoices(r){
   const rules={};
   if(r.attendanceDays){const v=r.attendanceDays.value,values=[v-1,v+1].filter(n=>n>=1&&n<=r.allowedDays.length&&(r.attendanceDays.mode==='exact'||n>v));if(values.length)rules.attendance_days={label:'등교일 '+v+'일 → '+values.join('일 또는 ')+'일',values,step:1}}
   if(r.morning)rules.morning_limit={label:'오전 수업 상한 '+r.morning.max+' → '+(r.morning.max+1)+' 또는 '+(r.morning.max+2),values:[r.morning.max+1,r.morning.max+2],step:1};
-  const c=r.credits.total,values=[1,2].map(n=>({min:Math.max(1,c.min-n),max:Math.min(24,c.max+n)})).filter(v=>v.min!==c.min||v.max!==c.max);
+  const c=r.credits.total,values=[1,2].map(n=>({min:Math.max(0.5,c.min-n),max:Math.min(24,c.max+n)})).filter(v=>v.min!==c.min||v.max!==c.max);
   if(values.length)rules.credit_range={label:'총 학점 범위를 위아래 최대 2학점 넓히기',values,step:1};
   if(r.lunch.enabled&&r.lunch.duration>15)rules.lunch_duration={label:'필수 점심 '+r.lunch.duration+'분 → '+[15,30].map(n=>r.lunch.duration-n).filter(n=>n>0).join('분 또는 ')+'분',values:[15,30].map(n=>r.lunch.duration-n).filter(n=>n>0),step:15};
   return rules;

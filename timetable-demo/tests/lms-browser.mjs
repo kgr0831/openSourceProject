@@ -1,3 +1,4 @@
+import {scheduler} from './fixtures/schedule.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -28,7 +29,7 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
     if(gated)await new Promise((resolve,reject)=>{release=resolve;options.client.signal.addEventListener('abort',()=>reject({code:'CANCELLED'}),{once:true})});
     return collectLms(options);
   }});
-  const server=createTimetableServer({port:0,bridge:{status:async()=>({connected:false,loginState:'idle'}),close(){}},createLms:async()=>app});
+  const server=createTimetableServer({scheduler,port:0,bridge:{status:async()=>({connected:false,loginState:'idle'}),close(){}},createLms:async()=>app});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const browser=await chromium.launch({channel:'chrome',headless:true});
   const context=await browser.newContext({viewport:{width:1360,height:1050},acceptDownloads:true});
@@ -92,7 +93,7 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
 });
 
 test('브라우저에서 휴강, 충돌 확인, 보강 연결, 분반 변경 미리보기와 개인 일정 보존을 확인한다',{timeout:45000},async t=>{
-  const server=createTimetableServer({port:0,bridge:{close(){}},createLms:async()=>({
+  const server=createTimetableServer({scheduler,port:0,bridge:{close(){}},createLms:async()=>({
     resume(){},view:()=>({connection:'disconnected'}),async close(){}
   })});
   await new Promise((resolve,reject)=>server.once('error',reject).listen(0,'127.0.0.1',resolve));
