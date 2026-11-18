@@ -1,4 +1,5 @@
 import {courses, catalogInfo, catalogVersion, getCourses} from './catalog.mjs';
+export {careerCatalog, careerDataVersion} from './career-data.mjs';
 import {ortoolsProvider} from './ortools-provider.mjs';
 export {courses, catalogInfo, catalogVersion, getCourses} from './catalog.mjs';
 

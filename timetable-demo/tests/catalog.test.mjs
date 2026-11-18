@@ -126,9 +126,9 @@ test('건물 이동·연강 점수는 선택한 이전 수업과 요일별 강�
   assert.equal(candidate.cost,17);assert.equal(candidate.solverResult.metrics.legacy_cost_units,340);
 });
 
-test('API와 진로 추천은 선택한 학기·학과로 제한되고 큰 제외 목록도 받는다',{timeout:15000},async t=>{
+test('시간표 API는 선택 학기·학과로 제한하고 V2 진로 검색은 전체 과목을 사용한다',{timeout:15000},async t=>{
   let sent;
-  const bridge={close(){},async recommend(payload){sent=payload;return {model:'test',data:{evaluations:payload.courses.map(c=>({courseId:c.courseId,relevance:'uncertain',reason:'과목명만으로 확인 불가'}))}}}};
+  const bridge={close(){},async recommend(payload,schema,{mode}){if(mode==='career-query')return {model:'test',data:{keywords:['회계','재무']}};sent=payload;return {model:'test',data:{evaluations:payload.courses.map(c=>({courseId:c.courseId,relevance:'uncertain',reason:'진로와 연관성을 확인하지 못함'}))}}}};
   const server=createTimetableServer({port:0,bridge});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(async()=>{await server.closeServices();await new Promise(resolve=>server.close(resolve))});
@@ -141,7 +141,10 @@ test('API와 진로 추천은 선택한 학기·학과로 제한되고 큰 제�
   const post=(path,body)=>fetch(url+'/api/'+path,{method:'POST',headers:{'Content-Type':'application/json','X-Timetable-App':'1'},body:JSON.stringify(body)});
   const result=await post('career',{goal:'회계사',...scope}).then(r=>r.json());
   assert.deepEqual(Object.keys(sent).sort(),['courses','department','goal']);
-  assert.deepEqual(sent.courses.map(c=>c.courseId),meta.courses.map(c=>c.id));
+  assert.equal(result.source,'course-evidence-ai');assert.equal(result.searchedCourseCount,2195);
+  assert.ok(sent.courses.length>0&&sent.courses.length<=80);
+  assert.ok(sent.courses.every(c=>c.courseId.startsWith('career-')));
+  assert.ok(sent.courses.some(c=>typeof c.description==='string'&&c.description.length>0));
   assert.equal(result.term,scope.term);assert.equal(result.department,scope.department);assert.equal(result.catalogVersion,catalogVersion);
   const request={...meta.defaultRequest,excludedCourseIds:meta.courses.map(c=>c.id),note:'가'.repeat(400)};
   assert.ok(Buffer.byteLength(JSON.stringify(request))>8192);
