@@ -14,11 +14,14 @@ export const catalogInfo = {
 };
 export const sources = [{title: '제공된 강좌 JSON', path: 'data/courses.json'}, {title: '동일 자료의 CSV', path: 'data/courses.csv'}];
 
-export function getCourses({term = catalogInfo.term, department = catalogInfo.department} = {}) {
+export function getCourses({term = catalogInfo.term, department = catalogInfo.department} = {}, {courseIds, sectionIds} = {}) {
   if (!catalogInfo.terms.includes(term) || !catalogInfo.departments.includes(department)) {
     throw new Error('자료에 포함된 학기와 학과를 선택해 주세요.');
   }
-  return courses.filter(course => course.term === term).flatMap(course => {
+  return courses.filter(course =>
+    course.term === term && (!courseIds || courseIds.has(course.id) ||
+      (sectionIds?.size && course.sections.some(section => sectionIds.has(section.id))))
+  ).flatMap(course => {
     const sections = course.sections.filter(section => course.kind === 'general' || section.departments.includes(department));
     if (!sections.length) return [];
     return [{...course, sections, classification: [...new Set(sections.map(section => section.classification))].join(' / '), sectionCount: sections.length,

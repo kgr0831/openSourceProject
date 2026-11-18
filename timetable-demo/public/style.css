@@ -2055,3 +2055,31 @@ dialog[open]::backdrop { animation:backdrop-enter .2s ease-out; }
 .catalog-selectors .field{min-width:0;margin:0}.catalog-selectors select{width:100%;min-width:0}
 .catalog-count{font-size:14px;margin:10px 0 4px}.catalog-controls small{display:block;line-height:1.6}
 .course-card:disabled{opacity:.6;cursor:default}
+
+.timetable-warning {
+  background:#fff7e7;
+  border:1px solid #e9cc94;
+  border-radius:14px;
+  color:#573a12;
+  padding:14px 16px;
+  font-size:14px;
+  line-height:1.6;
+  overflow-wrap:anywhere;
+}
+.timetable-warning h3 { font-size:15px; }
+.timetable-warning ul {
+  margin:8px 0 0;
+  padding-inline-start:20px;
+}
+.timetable-warning li+li { margin-top:8px; }
+.timetable-warning .course-chips { margin-top:8px; }
+.timetable-warning .button { min-height:44px; }
+.candidate-travel-warning { margin:12px 0; }
+#course-time-check:not(:empty) { margin-bottom:12px; }
+#course-time-check > .muted { font-size:14px; }
+.course-time-shortcut {
+  color:#765019;
+  margin-inline-start:8px;
+  padding-inline:8px;
+  text-decoration:underline;
+}

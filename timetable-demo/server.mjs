@@ -5,6 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {CodexBridge,openBrowser} from './codex.mjs';
 import * as liveScheduler from './schedule.mjs';
+import {checkCourseCompatibility} from './course-compatibility.mjs';
 import {ortoolsProvider} from './ortools-provider.mjs';
 import {friendlyError} from '../lms-parser/errors.mjs';
 
@@ -24,6 +25,9 @@ files['/ui.js']=['ui.js','text/javascript; charset=utf-8'];
 files['/design-assets.js']=['design-assets.js','text/javascript; charset=utf-8'];
 files['/career-model.mjs']=['career-model.mjs','text/javascript; charset=utf-8'];
 files['/solver-ui.js']=['solver-ui.js','text/javascript; charset=utf-8'];
+for(const module of ['timetable-warning-ui.js','travel-warnings.mjs','campus-walking-routes.mjs']){
+  files['/'+module]=[module,'text/javascript; charset=utf-8'];
+}
 files['/calendar-logic.mjs']=['calendar-logic.mjs','text/javascript; charset=utf-8'];
 files['/calendar-display.mjs']=['calendar-display.mjs','text/javascript; charset=utf-8'];
 files['/calendar-view.js']=['calendar-view.js','text/javascript; charset=utf-8'];
@@ -79,6 +83,12 @@ const server=http.createServer(async(req,res)=>{
     if(req.method!=='POST')return reply(res,404,{error:'페이지를 찾을 수 없습니다.'});
     if(req.headers['x-timetable-app']!=='1')return reply(res,403,{error:'앱 화면에서 다시 시도해 주세요.'});
     const body=await readJson(req);
+    if(url.pathname==='/api/course-compatibility'){
+      if(body?.catalogVersion!==undefined&&body.catalogVersion!==defaultRequest.catalogVersion){
+        throw new Error('과목 자료를 다시 불러와 주세요.');
+      }
+      return reply(res,200,checkCourseCompatibility(getCourses,body));
+    }
     if(url.pathname.startsWith('/api/lms/')){
       const actions={'/api/lms/connect':app=>app.connect(),'/api/lms/confirm-login':app=>app.confirmLogin(),
         '/api/lms/focus-login':app=>app.focusLogin(),'/api/lms/disconnect':app=>app.disconnect({forget:true}),

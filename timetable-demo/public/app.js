@@ -8,6 +8,7 @@ import {setupLms} from './lms.js';
 import {lmsTimeLabel} from './lms-calendar.mjs';
 import {kindLabels,exportCalendar,addDays,koreanToday,sectionLocation,timeText,timeValue} from './planner-core.mjs';
 import {esc,icon,button,link,heading,info,field,toggle,tabs,footer,timetable,layoutTimetables,layoutTabs,animateElements,dayNames,longestDay} from './ui.js';
+import {courseCompatibilityNotice,candidateTravelNotice} from './timetable-warning-ui.js';
 
 const $=id=>document.getElementById(id);
 const store=createPlannerStore({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)});
@@ -18,6 +19,7 @@ const state={
   source:'rules',aiStatus:null,aiMessage:'',noteTitle:'',noteBody:'',lastMode:'rules',resultRequest:null,interpretation:null,lmsCalendar:null
 };
 let toastTimer,pollTimer,requestVersion=0,lmsReady=false,pendingCalendar=null,calendarWidget=null;
+let courseTimeCheck=null;
 const allEvents=()=>[...calendarEvents(store.data.events),...(state.lmsCalendar?.events||[])];
 const calendarOptions=()=>({externalEvents:state.lmsCalendar?.events||[]});
 const titles={start:'캠퍼스 시간표',courses:'과목 고르기',preferences:'생활 패턴 정하기',advanced:'세부 선호',results:'추천 시간표',saved:'내 시간표',career:'희망진로 검색','career-list':'진로 추천 과목',calendar:'학기 일정',export:'캘린더 내보내기',experience:'수강 경험',record:'나의 수강 기록',empty:'추천 결과',loading:'시간표 찾는 중',error:'연결 확인',ai:'AI에게 요청하기'};
@@ -96,12 +98,42 @@ function courseList(){
   }).join('')+(count===0?'<p class="empty-copy">검색 결과가 없어요. 다른 과목명으로 찾아보세요.</p>':'')+(!state.showAll&&!q&&count>3?button('다른 과목 '+(count-3)+'개 보기','more-courses','quiet'):'');
 }
 function selectionSummary(){const list=state.courses.filter(c=>state.request.requiredCourseIds.includes(c.id));return list.length?list.length+'과목 · '+list.reduce((n,c)=>n+c.credits,0)+'학점 선택':'과목을 고르지 않으면 조건에 맞춰 추천해요'}
+function renderCourseCompatibility(){
+  const region=$('course-time-check'),result=courseTimeCheck?.result;
+  region.dataset.status=result?.status??(courseTimeCheck?'pending':'idle');
+  region.innerHTML=courseCompatibilityNotice(result,state.request.requiredCourseIds);
+  $('course-time-shortcut').innerHTML=result?.status==='conflict'
+    ? button('시간 충돌 확인','show-course-conflict','course-time-shortcut') : '';
+}
+function syncCourseCompatibility(){
+  const request=$('course-time-check')&&!state.catalogBusy?state.request:null;
+  if(!request||(!request.requiredCourseIds.length&&!request.lockedSectionIds.length)){
+    courseTimeCheck?.controller.abort();
+    courseTimeCheck=null;
+    return;
+  }
+  const {term,department,catalogVersion,requiredCourseIds,lockedSectionIds,excludedSectionIds}=request;
+  const payload={term,department,catalogVersion,requiredCourseIds,lockedSectionIds,excludedSectionIds};
+  const key=JSON.stringify(payload);
+  if(courseTimeCheck?.key===key){renderCourseCompatibility();return}
+  courseTimeCheck?.controller.abort();
+  const check={key,controller:new AbortController(),result:null};
+  courseTimeCheck=check;
+  renderCourseCompatibility();
+  api('course-compatibility',payload,AbortSignal.any([check.controller.signal,AbortSignal.timeout(5000)]))
+    .catch(()=>({status:'error'}))
+    .then(result=>{
+      if(courseTimeCheck!==check)return;
+      check.result=result;
+      renderCourseCompatibility();
+    });
+}
 function coursesView(){
   return body(heading('꼭 듣고 싶은 과목부터','필수 과목은 유지하고, 나머지는 추천받아요.')+catalogControls()+careerRequiredPanel()+
     '<label class="sr-only" for="course-search">과목명으로 검색</label><input id="course-search" type="search" placeholder="과목명으로 검색" value="'+esc(state.query)+'">'+
-    tabs([['all','전체'],['major','전공'],['general','교양']],state.kind,'course-kind')+'<div id="course-list" class="stack compact">'+courseList()+'</div>'+(state.request.preferredCourseIds.length?'<div class="interest-box"><strong>우선 살펴볼 관심 과목</strong><div class="course-chips">'+state.request.preferredCourseIds.map(id=>button(esc(state.courses.find(c=>c.id===id)?.name)+' ×','remove-interest','interest-chip','data-id="'+id+'" aria-label="'+esc(state.courses.find(c=>c.id===id)?.name)+' 관심 해제"')).join('')+'</div><small>필수 과목과 시간 조건에 맞으면 우선 추천해요.</small></div>':'')+link('어떤 과목을 들을지 고민이라면','career')+
+    tabs([['all','전체'],['major','전공'],['general','교양']],state.kind,'course-kind')+'<div><div id="course-time-check" role="status" tabindex="-1" data-status="idle"></div><div id="course-list" class="stack compact">'+courseList()+'</div></div>'+(state.request.preferredCourseIds.length?'<div class="interest-box"><strong>우선 살펴볼 관심 과목</strong><div class="course-chips">'+state.request.preferredCourseIds.map(id=>button(esc(state.courses.find(c=>c.id===id)?.name)+' ×','remove-interest','interest-chip','data-id="'+id+'" aria-label="'+esc(state.courses.find(c=>c.id===id)?.name)+' 관심 해제"')).join('')+'</div><small>필수 과목과 시간 조건에 맞으면 우선 추천해요.</small></div>':'')+link('어떤 과목을 들을지 고민이라면','career')+
     '<details class="disclosure"><summary>추천에서 제외할 과목</summary><div class="exclude-list">'+state.courses.map(c=>'<label><input type="checkbox" data-exclude="'+esc(c.id)+'" '+(state.request.excludedCourseIds.includes(c.id)?'checked':'')+'>'+esc(c.name)+'</label>').join('')+'</div></details>','compact')+
-    footer(link('생활 패턴 정하기','preferences','primary'),'<span id="selection-summary">'+selectionSummary()+'</span>');
+    footer(link('생활 패턴 정하기','preferences','primary'),'<span id="selection-summary">'+selectionSummary()+'</span><span id="course-time-shortcut"></span>');
 }
 function timeOptions(value){return [...new Set([value,...Array.from({length:49},(_,i)=>i*30)])].sort((a,b)=>a-b).map(m=>'<option value="'+m+'" '+(m===value?'selected':'')+'>'+timeText(m)+'</option>').join('')}
 function preferencesView(){
@@ -139,7 +171,7 @@ function resultsView(){
   const flags='✓ 필수 '+applied.requiredCourseIds.length+'과목 포함'+(!c.metrics.dayList.includes(4)?'　✓ 금요일 공강':'');
   const summary='<div class="metrics">'+[[c.credits+'학점','이번 학기'],[c.metrics.days+'일','등교'],[timeText(earliest),'첫 수업']].map(([v,l])=>'<div><strong>'+v+'</strong><span>'+l+'</span></div>').join('')+'</div>';
   return body('<div class="desktop-heading">'+heading('나에게 맞는 한 주를 골라요','필수 과목과 가능한 시간을 만족하는 추천안이에요.')+'</div><div class="mobile-only">'+heading('이런 한 주는 어때요?')+'</div>'+
-    '<div class="compare-layout"><div class="schedule-main"><div class="mobile-only">'+candidateTabs()+summary+'</div><div class="desktop-only table-tools"><h2>'+esc(c.strategy)+'</h2><span class="chip">'+c.credits+'학점 · 등교 '+c.metrics.days+'일</span></div><div class="timetable-surface">'+timetable(c)+'</div>'+
+    '<div class="compare-layout"><div class="schedule-main"><div class="mobile-only">'+candidateTabs()+summary+'</div><div class="desktop-only table-tools"><h2>'+esc(c.strategy)+'</h2><span class="chip">'+c.credits+'학점 · 등교 '+c.metrics.days+'일</span></div>'+candidateTravelNotice(c.sections)+'<div class="timetable-surface">'+timetable(c)+'</div>'+
     changesNotice(c)+'<div class="recommendation-reason"><p class="accent-text">'+flags+'</p><p>'+reason(c)+'</p>'+(c.metrics.lunchMissedDays?'<small>점심 1시간을 확보하지 못한 날이 '+c.metrics.lunchMissedDays+'일 있어요.</small>':'')+'</div>'+link('조건 다시 조정하기','preferences')+
     '<details class="disclosure"><summary>과목과 추천 이유 자세히</summary>'+(c.careerAssessment?'<p>희망 진로: '+esc(c.careerAssessment.goal)+'</p><small>'+esc(c.careerAssessment.notice)+'</small>':'')+'<p>'+esc(c.aiReason||'필수 조건을 지킨 유효 후보 중 서로 다른 시간표를 골랐어요.')+'</p>'+c.sections.map(s=>'<p>'+esc(s.name)+' · '+s.credits+'학점'+(c.careerAssessment?.evaluations.find(e=>e.courseId===s.courseId&&e.relevance!=='uncertain')?'<br>'+esc(c.careerAssessment.evaluations.find(e=>e.courseId===s.courseId).reason):'')+'</p>').join('')+'<p>'+esc(c.solverResult?.ranking_proven?'선택한 기준에서 우선순위를 확인한 결과예요.':'시간 안에 찾은 결과예요. 더 좋은 조합이 있을 수 있어요.')+'</p>'+'<p>적용 조건: '+applied.allowedDays.map(d=>dayNames[d]).join('·')+' / '+timeText(applied.earliestStart)+'–'+timeText(applied.latestEnd)+' / 총 '+applied.credits.total.min+'–'+applied.credits.total.max+'학점</p>'+(state.interpretation?.summary?'<p>'+esc(state.interpretation.summary)+'</p>':'')+(state.interpretation?.unsupported?.length?'<p>반영하지 못한 요청: '+state.interpretation.unsupported.map(esc).join(', ')+'</p>':'')+'<small>'+esc(state.catalogInfo.notice||'')+'</small></details></div>'+
     '<aside class="comparison-side desktop-only"><h2>나에게 중요한 기준</h2>'+state.options.map(comparisonCard).join('')+
@@ -350,6 +382,7 @@ function render(motion='none'){
   calendarWidget=null;
   const plannerScreen=['saved','calendar'].includes(state.route)?' planner-screen':'';
   $('app').innerHTML='<div class="app-shell">'+sidebar()+'<div class="workspace"><header class="desktop-topbar"><span>'+semesterLabel()+'</span><span class="user-label">나의 캠퍼스 '+icon('desktopSaved','imgUser')+'</span></header><main id="content" class="screen '+(wide?'wide':'')+plannerScreen+'" data-route="'+state.route+'">'+renderHeader()+content+'</main></div></div>';
+  syncCourseCompatibility();
   if($('lms-slot')){$('lms-slot').append(lmsHost);lmsHost.hidden=false}
   if($('semester-calendar'))mountSemesterCalendar();
   layoutTimetables();layoutTabs(sameRoute?previousTabs:new Map());
@@ -523,6 +556,12 @@ async function act(action,el){
     case 'back':back();break;
     case 'new':go('courses');break;
     case 'course':state.request=toggleRequiredCourse(state.request,el.dataset.id);render();break;
+    case 'show-course-conflict':$('course-time-check').focus();break;
+    case 'remove-conflicting-course':
+      if(state.request.requiredCourseIds.includes(el.dataset.id)){
+        state.request=toggleRequiredCourse(state.request,el.dataset.id);render();$('course-search').focus();
+      }
+      break;
     case 'course-kind':state.kind=el.dataset.value;render('list');break;
     case 'more-courses':state.showAll=true;render('list');break;
     case 'remove-interest':state.request.preferredCourseIds=state.request.preferredCourseIds.filter(id=>id!==el.dataset.id);render();break;
