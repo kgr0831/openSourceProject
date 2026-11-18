@@ -11,7 +11,8 @@ const {chromium}=createRequire(new URL('../../lms-parser/package.json',import.me
 
 test('실제 강좌를 학기·학과로 선택하고 추천·저장·복원하며 토요일과 모바일을 표시한다',{timeout:90000},async t=>{
   let careerPayload;
-  const server=createTimetableServer({port:0,bridge:{close(){},async recommend(payload){
+  const server=createTimetableServer({port:0,bridge:{close(){},async recommend(payload,schema,{mode}){
+    if(mode==='career-query')return {model:'test',data:{keywords:['회계','재무']}};
     careerPayload=payload;
     return {model:'test',data:{evaluations:payload.courses.map((c,index)=>({courseId:c.courseId,relevance:index===0?'high':'uncertain',reason:'과목명 기반 테스트'}))}};
   }},createLms:async()=>({resume(){},view:()=>({connection:'disconnected'}),async close(){}})});
@@ -44,7 +45,7 @@ test('실제 강좌를 학기·학과로 선택하고 추천·저장·복원하�
   await navigate('career');await page.locator('#career-goal').fill('회계사');
   await page.locator('[data-action="career-evaluate"]').click();
   await page.locator('main[data-route="career-list"]').waitFor();
-  assert.equal(careerPayload.department,'경영학부');assert.ok(careerPayload.courses.every(c=>c.courseId.startsWith('ssu-2026-1-')));
+  assert.equal(careerPayload.department,'경영학부');assert.ok(careerPayload.courses.every(c=>c.courseId.startsWith('career-')));
   const career=(await saved()).careerRecommendations;
   await page.reload();await page.locator('#catalog-term').waitFor();
   assert.equal(await page.locator('#catalog-term').inputValue(),'2026-1');
@@ -58,6 +59,7 @@ test('실제 강좌를 학기·학과로 선택하고 추천·저장·복원하�
   await page.locator('#course-search').fill(algorithm.name);
   await page.locator('[data-action="course"][data-id="'+algorithm.id+'"]').click();
   await page.locator('main a[href="#preferences"]').click();
+  await page.locator('main[data-route="preferences"]').waitFor();
   assert.equal(await page.locator('[data-day]').count(),7);
   await page.locator('[data-action="recommend"]').click();
   await page.locator('main[data-route="results"]').waitFor({timeout:30000});
