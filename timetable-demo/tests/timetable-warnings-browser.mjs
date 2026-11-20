@@ -169,3 +169,138 @@ test('빠른 선택 변경과 학기·학과 전환이 이전 시간 확인 응�
   }
   assert.deepEqual(errors, []);
 });
+
+for (const mobile of [false, true]) {
+  test('과목 필터, 목표 학점과 수업시간을 확인한다 (' + (mobile ? '모바일 390px 터치' : 'PC 1440px') + ')',
+    {timeout: 85000}, async t => {
+      const {page, errors} = await openTestPage(t, mobile);
+      const {press, pick, checked} = actions(page, mobile);
+      const button = name => page.getByRole('button', {name, exact: true});
+      const next = () => press(page.getByRole('link', {name: '생활 패턴 정하기'}));
+      const back = () => press(button('이전 화면'));
+      const filter = name => press(button(name));
+      const goal = page.locator('#target-credits');
+      const courseButton = name => page.locator('#course-list [data-id="' + courseId(name) + '"]');
+      const timeDetails = name => page.locator('[data-course-time="' + courseId(name) + '"]');
+      const meetingCount = (name, count) => timeDetails(name).locator('[data-matching="' + count + '"]').waitFor();
+      const checkRequests = [], recommendRequests = [];
+      page.on('request', request => {
+        if (request.url().endsWith('/api/course-compatibility')) checkRequests.push(request.postDataJSON());
+        if (request.url().endsWith('/api/candidates')) recommendRequests.push(request.postDataJSON());
+      });
+      assert.equal(await button('학점 0.5학점').isVisible(), true);
+      assert.equal(await button('학점 6학점').isVisible(), true);
+      for (const name of ['전공', '이수구분 선택', '학점 3학점', '대상 학년 4학년']) await filter(name);
+      await courseButton(special).waitFor();
+      await pick(special);
+      await checked('compatible');
+      assert.match(await page.locator('#selection-summary').innerText(), /1과목 · 3학점/);
+      await page.locator('#course-search').fill('검색결과없음');
+      assert.equal(await courseButton(special).count(), 0);
+      await filter('필터 초기화');
+      assert.equal(await button('전체').getAttribute('aria-pressed'), 'true');
+      assert.equal(await courseButton(special).getAttribute('aria-pressed'), 'true');
+
+      for (const name of ['교양', '이수구분 선택', '학점 2학점', '대상 학년 1학년', '대상 학년 2학년']) await filter(name);
+      await courseButton('대학생활과진로탐색').waitFor();
+      assert.equal(await courseButton(special).count(), 0);
+      assert.match(await page.locator('#selection-summary').innerText(), /1과목 · 3학점/);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+
+      const checksBeforePreferences = checkRequests.length;
+      const specialRow = timeDetails(special).locator('..');
+      await next();
+      assert.equal(await goal.inputValue(), '3');
+      await meetingCount(special, 0);
+      assert.match(await specialRow.locator('.course-time-reason').innerText(), /수요일 수업은 09:00에 시작.*10:00.*09:00까지 앞당겨/);
+      await press(timeDetails(special).locator('summary'));
+      assert.equal(await timeDetails(special).locator('.section-meetings li').count(), 2);
+      await page.locator('#earliestStart').selectOption('540');
+      await meetingCount(special, 1);
+      assert.equal(await timeDetails(special).getAttribute('open'), '');
+      assert.match(await timeDetails(special).locator('.section-meetings').innerText(), /수요일 09:00~10:15.*정보과학관 21303/s);
+      await page.locator('#latestEnd').selectOption('690');
+      await meetingCount(special, 0);
+      assert.match(await specialRow.locator('.course-time-reason').innerText(), /11:45에 끝나요/);
+      await page.locator('#latestEnd').selectOption('1080');
+      await meetingCount(special, 1);
+      assert.equal(checkRequests.length, checksBeforePreferences);
+      assert.deepEqual(recommendRequests, []);
+
+      await back();
+      await filter('필터 초기화');
+      await pick(statistics);
+      await checked('conflict');
+      await next();
+      await meetingCount(statistics, 0);
+      assert.match(await timeDetails(statistics).locator('..').locator('.course-time-reason').innerText(), /금요일이 등교 요일에서 빠졌어요/);
+      await press(page.locator('label:has(input[data-day="4"])'));
+      await meetingCount(statistics, 1);
+      await meetingCount(special, 1);
+      const joint = page.locator('.course-time-combination');
+      assert.match(await joint.innerText(), /수요일 10:30~11:45에 겹쳐요/);
+      await press(page.locator('label:has(input[data-day="4"])'));
+
+      await back();
+      await pick(statistics);
+      await pick(algorithm);
+      await pick(onDevice);
+      await pick('자료구조');
+      await checked('compatible');
+      await next();
+      assert.equal(await goal.inputValue(), '12');
+      assert.equal(await page.locator('#credit-ranges-summary').innerText(), '전공 12 · 교양 0');
+      await meetingCount(algorithm, 2);
+      const algorithmDetails = timeDetails(algorithm);
+      assert.equal(await algorithmDetails.locator('..').locator('.course-time-reason').count(), 0);
+      await press(algorithmDetails.locator('summary'));
+      assert.equal(await algorithmDetails.locator('.section-time-option').count(), 4);
+      assert.equal(await algorithmDetails.locator('.section-meetings li').count(), 8);
+      assert.match(await algorithmDetails.innerText(), /2150163304.*금요일 10:30~11:45.*금요일 12:00~13:15/s);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+
+      await goal.fill('18');
+      await back();
+      await next();
+      assert.equal(await goal.inputValue(), '18');
+      const response = page.waitForResponse(r => r.url().endsWith('/api/candidates'));
+      await press(button('추천 시간표 보기'));
+      const solved = await response;
+      assert.equal(solved.status(), 200);
+      const required = [special, algorithm, onDevice, '자료구조'].map(courseId).sort();
+      assert.deepEqual([...recommendRequests[0].requiredCourseIds].sort(), required);
+      assert.deepEqual(recommendRequests[0].credits, {
+        total: {min: 18, max: 18}, major: {min: 12, max: 18}, general: {min: 0, max: 6}
+      });
+      const {candidates} = await solved.json();
+      assert.ok(candidates.some(candidate => candidate.credits === 18 &&
+        required.every(id => candidate.sections.some(section => section.courseId === id))));
+      await page.locator('main[data-route="results"]').waitFor();
+      assert.deepEqual(errors, []);
+    });
+}
+
+test('선택 과목이 수동 목표를 넘을 때 알리고 직접 정한 세부 범위는 보존한다', {timeout: 35000}, async t => {
+  const {page, errors} = await openTestPage(t, false);
+  const {pick} = actions(page, false);
+  const next = () => page.getByRole('link', {name: '생활 패턴 정하기'}).click();
+  const goal = page.locator('#target-credits'), message = page.locator('#credit-check');
+  await pick(special);
+  await next();
+  await goal.fill('4');
+  await page.getByRole('button', {name: '이전 화면'}).click();
+  await pick(algorithm);
+  await next();
+  assert.equal(await goal.inputValue(), '6');
+  assert.match(await message.innerText(), /4학점을 넘어 목표를 6학점으로 올렸어요/);
+  await page.getByRole('link', {name: '더 세밀하게 설정하기'}).click();
+  await page.getByText('학점 범위 직접 설정', {exact: true}).click();
+  await page.getByLabel('전공 최소').fill('0');
+  await page.getByLabel('전공 최대').fill('3');
+  assert.match(await message.innerText(), /선택한 전공 과목이 6학점.*최대 학점/);
+  await page.getByRole('link', {name: '선호 저장하기'}).click();
+  assert.equal(await goal.inputValue(), '6');
+  assert.match(await page.locator('#credit-ranges-summary').innerText(), /전공 0~3/);
+  assert.equal(await page.locator('#recommend-timetable').isDisabled(), true);
+  assert.deepEqual(errors, []);
+});

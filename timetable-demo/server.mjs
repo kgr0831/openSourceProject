@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {CodexBridge,openBrowser} from './codex.mjs';
 import * as liveScheduler from './schedule.mjs';
 import {checkCourseCompatibility} from './course-compatibility.mjs';
+import {courseFacets} from './public/course-filters.mjs';
 import {ortoolsProvider} from './ortools-provider.mjs';
 import {friendlyError} from '../lms-parser/errors.mjs';
 
@@ -25,7 +26,8 @@ files['/ui.js']=['ui.js','text/javascript; charset=utf-8'];
 files['/design-assets.js']=['design-assets.js','text/javascript; charset=utf-8'];
 files['/career-model.mjs']=['career-model.mjs','text/javascript; charset=utf-8'];
 files['/solver-ui.js']=['solver-ui.js','text/javascript; charset=utf-8'];
-for(const module of ['timetable-warning-ui.js','travel-warnings.mjs','campus-walking-routes.mjs']){
+for(const module of ['timetable-warning-ui.js','travel-warnings.mjs','campus-walking-routes.mjs',
+  'course-credits.mjs','course-filters.mjs','course-times.mjs','course-flow-ui.js']){
   files['/'+module]=[module,'text/javascript; charset=utf-8'];
 }
 files['/calendar-logic.mjs']=['calendar-logic.mjs','text/javascript; charset=utf-8'];
@@ -72,7 +74,7 @@ const server=http.createServer(async(req,res)=>{
       const scope={term:url.searchParams.get('term')??defaultRequest.term,department:url.searchParams.get('department')??defaultRequest.department};
       const selected=getCourses(scope);
       return reply(res,200,{courses:selected.map(({sections,...course})=>({...course,
-        sectionCount:sections.length,availableSectionCount:sections.filter(section=>section.meetings.length).length})),
+        facets:courseFacets(sections),sectionCount:sections.length,availableSectionCount:sections.filter(section=>section.meetings.length).length})),
         defaultRequest:{...defaultRequest,...scope},catalogInfo:{...catalogInfo,...scope,
           majorCount:selected.filter(course=>course.kind==='major').length,generalCount:selected.filter(course=>course.kind==='general').length,
           selectedCourseCount:selected.length,selectedSectionCount:selected.reduce((count,course)=>count+course.sections.length,0),
