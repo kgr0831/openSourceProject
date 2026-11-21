@@ -59,6 +59,8 @@ test('실제 강좌를 학기·학과로 선택하고 추천·저장·복원하�
   await page.locator('[data-action="course"][data-id="'+algorithm.id+'"]').click();
   await page.locator('main a[href="#preferences"]').click();
   assert.equal(await page.locator('[data-day]').count(),7);
+  assert.equal(await page.locator('#target-credits').inputValue(),'3');
+  await page.locator('#target-credits').fill('13');
   await page.locator('[data-action="recommend"]').click();
   await page.locator('main[data-route="results"]').waitFor({timeout:30000});
   await page.locator('[data-action="confirm"]:visible').click();

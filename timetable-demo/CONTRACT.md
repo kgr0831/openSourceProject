@@ -33,6 +33,8 @@ POST는 `Content-Type: application/json`, `X-Timetable-App: 1`이 필요하다. 
 
 `total`은 이번에 반환한 후보 수다. 전체 가능 시간표 수는 `totalUniqueCount`이며 전수 종료 증명 전에는 `null`이다. `solver`에 상세 증명 메타데이터가 있고 각 후보의 `solverResult`에 원래/유효 조건 및 변경 내역이 있다. 저장 데이터 형식은 유지하고 후보에 원래 요청 스냅샷을 추가했다.
 
+추천 결과가 0개이고 원래 조건이 `INFEASIBLE`로 확인됐다면 응답의 `emptyGuidance`에 확인한 이유와 검증된 변경안을 제공한다. `diagnostics`는 기존 형식과 순서로 반환한다. 변경안에는 실제 후보와 변경 필드가 포함된다. 기존 완화 규칙은 별도 요청에서 적용하며, 시작·종료 시각 제안은 해당 시각만 명시적으로 바꾼 요청으로 검증한다. 후보를 열면 변경 내역이 표시되며 입력 조건과 저장 상태는 기존 값으로 유지된다.
+
 ## Node/worker 및 CLI 입력
 
 셸을 거치지 않는 자식 프로세스의 stdin/stdout으로 UTF-8 JSON 문서 한 개씩 통신한다. 오류는 `{error:{code,message}}`다. 진단 로그는 JSON 채널에 넣지 않는다.

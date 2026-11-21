@@ -1,5 +1,6 @@
 import {courses, catalogInfo, catalogVersion, getCourses} from './catalog.mjs';
 import {ortoolsProvider} from './ortools-provider.mjs';
+import {SolverError} from './ortools-contract.mjs';
 export {courses, catalogInfo, catalogVersion, getCourses} from './catalog.mjs';
 
 export function createScheduler({courses, version='ssu-fictional-v1', info={}, selectCourses=()=>courses}) {
@@ -99,6 +100,7 @@ async function generateCandidates(raw,{mode='recommend',baseline,signal,searchOp
   const candidates=solver.recommendations.map((result,i)=>({...candidate(result.section_ids.map(id=>knownSections.get(id)),request),strategy:request.rankingProfile==='personalized'?names[result.profile]:names[result.profile]+' '+(i+1),solverResult:result,requestSnapshot:structuredClone(request)}));
   const diagnostics=[...solver.diagnostics];
   if(!candidates.length){
+    if(solver.termination_reason==='MODEL_INVALID')throw new SolverError('MODEL_INVALID','CP-SAT 모델 검증에 실패했습니다.');
     if(solver.original_status==='INFEASIBLE'){
       const ranges=request.credits,availableMinutes=request.allowedDays.length*(request.latestEnd-request.earliestStart);
       const required=courses.filter(c=>request.requiredCourseIds.includes(c.id)),groups=required.filter(c=>c.group).map(c=>c.group);
