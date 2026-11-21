@@ -1,5 +1,5 @@
 import {groupCareerCourses,toggleRequiredCourse} from './career-model.mjs';
-import {hardConditions,updateHardCondition,relaxationDialog,relaxationPolicy,changesNotice} from './solver-ui.js';
+import {hardConditions,updateHardCondition,relaxationDialog,relaxationPolicy,changesNotice,emptyGuidanceView} from './solver-ui.js';
 import {createPlannerStore} from './planner.js';
 import {calendarEvents} from './calendar-logic.mjs';
 import {calendarDateLabel,calendarPeriodLabel,calendarViews,calendarWeekBounds,eventKindLabel,koreanDate,stepCalendarDate,toCalendarEvents} from './calendar-display.mjs';
@@ -21,7 +21,7 @@ const state={
   courseFilters:emptyCourseFilters(),creditChoice:{mode:'auto'},creditFeedback:{},
   careerGoal:store.data.careerRecommendations?.goal||'',careerBusy:false,selectedDate:koreanToday(),selectedMinute:null,
   calendarMode:'week',showCalendarClasses:true,eventOriginal:null,eventDraft:null,error:'',diagnostics:[],busy:false,controller:null,
-  source:'rules',aiStatus:null,aiMessage:'',noteTitle:'',noteBody:'',lastMode:'rules',resultRequest:null,interpretation:null,lmsCalendar:null
+  source:'rules',aiStatus:null,aiMessage:'',noteTitle:'',noteBody:'',lastMode:'rules',resultRequest:null,interpretation:null,lmsCalendar:null,emptyGuidance:null
 };
 let toastTimer,pollTimer,requestVersion=0,lmsReady=false,pendingCalendar=null,calendarWidget=null;
 let courseTimeCheck=null;
@@ -48,7 +48,7 @@ async function changeCatalog(scope){
     const meta=await api('meta?'+new URLSearchParams(scope));
     state.courses=meta.courses;state.catalogInfo=meta.catalogInfo;
     Object.assign(state.request,scope,{requiredCourseIds:[],preferredCourseIds:[],excludedCourseIds:[],lockedSectionIds:[],excludedSectionIds:[],catalogVersion:meta.defaultRequest.catalogVersion});
-    state.options=[];state.resultRequest=null;state.retryPayload=null;state.interpretation=null;state.solver=null;state.query='';state.showAll=false;state.courseFilters=emptyCourseFilters();
+    state.options=[];state.resultRequest=null;state.retryPayload=null;state.interpretation=null;state.solver=null;state.emptyGuidance=null;state.query='';state.showAll=false;state.courseFilters=emptyCourseFilters();
     syncCreditPlan();
     try{localStorage.setItem(scopeStorageKey,JSON.stringify(scope))}catch{flash('학기·학과 선택을 브라우저에 저장하지 못했어요.',true)}
     flash('학기·학과를 변경했어요. 듣고 싶은 과목을 다시 선택해 주세요.');
@@ -415,7 +415,15 @@ function recordView(){
     field('이 조합을 고른 이유','<textarea name="body" id="note-body" required maxlength="600" rows="6" placeholder="수업을 고른 이유와 기대하는 점을 자유롭게 적어 보세요.">'+esc(state.noteBody)+'</textarea>')+'<p class="form-error" id="record-error" role="alert"></p></form>')+
     footer(button('내 기록 저장하기','save-record','primary',c?'':'disabled'),'다른 사람에게 공개되지 않아요');
 }
-function emptyView(){const infeasible=state.solver?.original_status==='INFEASIBLE';return body('<div class="state-illustration">'+icon('empty','imgSearch')+'</div>'+heading(infeasible?'조건을 조금만 바꿔 볼까요?':'조금 더 찾아볼까요?',infeasible?'현재 필수 조건을 모두 만족하는 시간표가 없어요.':'시간 안에 결과를 찾지 못했어요. 다시 시도할 수 있어요.')+'<div class="card">'+state.diagnostics.map(d=>'<p>'+esc(d)+'</p>').join('')+'</div>'+(infeasible&&state.lastMode!=='alternative'?button('허용할 변경 범위 고르기','relax-options','secondary'):button('다시 찾아보기','retry','secondary')))+footer(link('조건 조정하기','preferences','primary'))}
+function emptyView(){
+  const infeasible=state.solver?.original_status==='INFEASIBLE';
+  return body('<div class="state-illustration">'+icon('empty','imgSearch')+'</div>'+
+    heading(infeasible?'조건을 조금만 바꿔 볼까요?':'조금 더 찾아볼까요?',infeasible?'현재 필수 조건을 모두 만족하는 시간표가 없어요.':'시간 안에 결과를 찾지 못했어요. 다시 시도할 수 있어요.')+
+    '<div class="card">'+state.diagnostics.map(d=>'<p>'+esc(d)+'</p>').join('')+'</div>'+
+    (infeasible&&state.emptyGuidance?emptyGuidanceView(state.emptyGuidance):'')+
+    (infeasible&&state.lastMode!=='alternative'?button('허용할 변경 범위 고르기','relax-options','secondary'):button('다시 찾아보기','retry','secondary')))+
+    footer(link('조건 조정하기','preferences','primary'));
+}
 function loadingView(){return body('<div class="state-illustration loading-symbol">'+icon('loading','imgSpark')+'</div>'+heading('나에게 맞는 한 주를 찾고 있어요','과목이 겹치지 않는지 확인하고<br>생활 패턴에 맞는 조합을 비교해요.')+'<div class="loading-line" role="progressbar" aria-label="추천 생성 중"></div><p class="muted center">'+(state.lastMode==='ai'?'AI가 요청을 해석하고 이유를 정리하고 있어요.':'유효한 시간표를 비교하고 있어요.')+'</p>')+footer(link('조건으로 돌아가기','preferences','secondary'))}
 function errorView(){return body('<div class="state-illustration">'+icon('error','imgAlert')+'</div>'+heading('잠시 확인이 필요해요',esc(state.error||'다시 시도하거나 조건을 확인해 주세요.'))+info('입력한 조건은 그대로예요','설정을 바꾸지 않고 다시 시도할 수 있어요.',icon('error','imgGrid')))+footer(button('다시 시도하기','retry')+link('조건 확인하기','preferences','secondary'))}
 function aiView(){
@@ -467,6 +475,7 @@ async function recommend(mode='rules',payload){
   if((mode==='rules'||mode==='ai')&&state.creditFeedback.blocked){
     flash(state.creditFeedback.message,true);return;
   }
+  state.emptyGuidance=null;
   state.lastMode=mode;if(payload)state.retryPayload=payload;else if(!['relax','alternative'].includes(mode))state.retryPayload=null;state.busy=true;const version=++requestVersion;state.controller=new AbortController();
   go('loading');
   const timeout=setTimeout(()=>state.controller?.abort(),mode==='ai'?240000:30000);
@@ -484,6 +493,7 @@ async function recommend(mode='rules',payload){
       }
     }
     state.solver=result.solver;state.resultRequest=structuredClone(result.request);state.interpretation=result.interpretation||null;state.diagnostics=result.diagnostics||[];
+    state.emptyGuidance=result.emptyGuidance??null;
     state.options=mode==='ai'&&result.recommendations?.length?result.recommendations.map((r,i)=>({...result.candidates.find(c=>c.id===r.id),strategy:'AI 추천 '+(i+1),aiReason:r.reason})):result.candidates;
     if(careerList(result.request))for(const c of state.options)c.careerAssessment=structuredClone(careerList(result.request));
     state.active=0;state.source=result.source||'rules';state.busy=false;go(state.options.length?'results':'empty');
@@ -645,6 +655,15 @@ async function act(action,el){
     case 'candidate':if(state.active!==Number(el.dataset.value)){state.active=Number(el.dataset.value);render('schedule')}break;
     case 'recommend':await recommend();break;
     case 'recommend-ai':await recommend('ai');break;
+    case 'view-empty-option':{
+      const candidate=state.emptyGuidance?.options[Number(el.dataset.value)]?.candidate;
+      if(state.route!=='empty'||!candidate)break;
+      const request=candidate.requestSnapshot,career=careerList(request);
+      state.options=[career?{...candidate,careerAssessment:structuredClone(career)}:candidate];
+      state.resultRequest=structuredClone(request);
+      state.active=0;
+      go('results');break;
+    }
     case 'relax-options':dialog(relaxationDialog(state.request));break;
     case 'alternative':{
       const c=state.route==='saved'?store.data.semester?.candidate:current();

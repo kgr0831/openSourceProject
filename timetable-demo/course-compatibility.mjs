@@ -9,7 +9,7 @@ function selectionIds(value = [], label) {
   return new Set(value);
 }
 
-export function checkCourseCompatibility(getCourses, request, options) {
+export function selectCourseSections(getCourses, request) {
   if (!request || typeof request !== 'object' || Array.isArray(request)) {
     throw new Error('선택한 과목과 학기·학과를 확인해 주세요.');
   }
@@ -28,16 +28,20 @@ export function checkCourseCompatibility(getCourses, request, options) {
     throw new Error('이 학기와 학과의 고정 분반을 확인해 주세요.');
   }
 
-  const selected = [...new Set([...required, ...locked.keys()])].map(id => {
-    const {name, sections} = byId.get(id), fixedOptions = locked.get(id) ?? [];
+  return [...new Set([...required, ...locked.keys()])].map(id => {
+    const {name, credits, sections} = byId.get(id), fixedOptions = locked.get(id) ?? [];
     const lockedId = fixedOptions[0]?.id;
-    return {course: {id, name, locked: fixedOptions.length > 0},
+    return {course: {id, name, locked: fixedOptions.length > 0}, credits,
       sections: sections.map(({id, sectionLabel, courseNumber, meetings, locations, unavailableReason}) => ({
         id, sectionLabel, courseNumber, meetings, locations, unavailableReason,
         eligible: fixedOptions.length < 2 && (!lockedId || id === lockedId) && !excluded.has(id)
       }))
     };
   });
+}
+
+export function checkCourseCompatibility(getCourses, request, options) {
+  const selected = selectCourseSections(getCourses, request);
   const result = checkSectionCombinations(evaluateCourseTimes(selected), options);
   return request.includeSections === true ? {...result, selected} : result;
 }
