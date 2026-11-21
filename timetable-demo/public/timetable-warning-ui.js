@@ -45,7 +45,8 @@ export function candidateTravelNotice(sections) {
       if (warning.sourceKind === 'osm_walk') {
         source = '공개 보행로 추정 · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a>';
       }
-      const detail = source ? '<p>쉬는 시간 '+warning.gapMinutes+'분 · 층 이동 포함 약 '+warning.estimatedMinutes+'분 · '+source+'</p>' : '';
+      const spare = warning.spareMinutes >= 0 ? ' · 여유 '+warning.spareMinutes+'분' : '';
+      const detail = source ? '<p>쉬는 시간 '+warning.gapMinutes+'분 · 층 이동 포함 약 '+warning.estimatedMinutes+'분'+spare+' · '+source+'</p>' : '';
       return '<li><strong>'+esc(when+' · '+route)+'</strong><p>'+esc(message)+'</p>'+detail+'</li>';
     }).join('')+'</ul></section>';
 }

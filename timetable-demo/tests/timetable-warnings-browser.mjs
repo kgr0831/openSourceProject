@@ -375,7 +375,7 @@ test('도보 기록 도구의 기본·추정 내보내기와 실제 후보별 �
   const attribution = warning.getByRole('link', {name: /OpenStreetMap contributors/});
   assert.match(await warning.innerText(), /화요일 14:45 → 15:00 · 정보과학관 → 벤처중소기업센터/);
   assert.match(await warning.innerText(), /이동이 빠듯해요/);
-  assert.match(await warning.innerText(), /쉬는 시간 15분 · 층 이동 포함 약 14분 · 공개 보행로 추정/);
+  assert.match(await warning.innerText(), /쉬는 시간 15분 · 층 이동 포함 약 14분 · 여유 1분 · 공개 보행로 추정/);
   assert.equal(await attribution.getAttribute('href'), 'https://www.openstreetmap.org/copyright');
 
   await tab(1).click();
