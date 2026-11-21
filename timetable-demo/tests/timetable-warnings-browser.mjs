@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import {createTimetableServer} from '../server.mjs';
 import {getCourses} from '../catalog.mjs';
 import {storageKey} from '../public/planner.js';
+import {walkingRouteTimes} from '../public/walking-route-times.mjs';
 
 const {chromium} = createRequire(new URL('../../lms-parser/package.json', import.meta.url))('playwright');
 const scope = {term: '2026-2', department: 'AI소프트웨어학부'};
@@ -13,7 +15,7 @@ const special = '소프트웨어특강2', statistics = '확률및통계', onDevi
 const forensics = '디지털포렌식개론', algorithm = '알고리즘';
 const fridaySections = ['ssu-2026-2-2150166901', 'ssu-2026-2-2150163303'];
 
-async function openTestPage(t, mobile) {
+async function openTestPage(t, mobile, prepareWalkingModule) {
   const server = createTimetableServer({port: 0,
     createLms: async () => ({resume() {}, view: () => ({connection: 'disconnected'}), async close() {}})});
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -24,11 +26,18 @@ async function openTestPage(t, mobile) {
   });
   const browser = await chromium.launch({channel: 'chrome', headless: true});
   t.after(() => browser.close());
-  const page = await browser.newPage({viewport: mobile ? {width: 390, height: 844} : {width: 1440, height: 1000},
+  const context = await browser.newContext({viewport: mobile ? {width: 390, height: 844} : {width: 1440, height: 1000},
     isMobile: mobile, hasTouch: mobile, reducedMotion: 'reduce'});
+  const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.setDefaultTimeout(10000);
+  // Keep the original advisory regression repeatable after local data updates.
+  const module = prepareWalkingModule ? await prepareWalkingModule(context)
+    : walkingRouteTimes.length ? 'export const walkingRouteTimes = [];' : null;
+  if (module) await page.route('**/walking-route-times.mjs', route => route.fulfill({
+    contentType: 'text/javascript', body: module
+  }));
   await page.goto(url + '/#courses');
   await page.locator('#catalog-term').waitFor();
   assert.equal(await page.locator('#catalog-term').inputValue(), scope.term);
@@ -302,5 +311,87 @@ test('선택 과목이 수동 목표를 넘을 때 알리고 직접 정한 세�
   assert.equal(await goal.inputValue(), '6');
   assert.match(await page.locator('#credit-ranges-summary').innerText(), /전공 0~3/);
   assert.equal(await page.locator('#recommend-timetable').isDisabled(), true);
+  assert.deepEqual(errors, []);
+});
+
+test('도보 기록 도구의 기본·추정 내보내기와 실제 후보별 경고·저장을 확인한다', {timeout: 75000}, async t => {
+  const reference = JSON.parse(await readFile(new URL('../tools/campus-walk/data/campus-walk.json', import.meta.url), 'utf8'));
+  const {page, errors} = await openTestPage(t, false, async context => {
+    const recorder = await context.newPage();
+    try {
+      await recorder.goto(new URL('../tools/campus-walk/walk.html', import.meta.url).href);
+      const exportModule = async () => {
+        const download = recorder.waitForEvent('download');
+        await recorder.getByRole('button', {name: '프로젝트용 파일 받기'}).click();
+        const file = await download;
+        assert.equal(file.suggestedFilename(), 'walking-route-times.mjs');
+        const source = await readFile(await file.path(), 'utf8');
+        const rows = JSON.parse(source.split('export const walkingRouteTimes = ')[1].trim().slice(0, -1));
+        return {source, rows};
+      };
+      assert.equal(await recorder.locator('#include-osm').isChecked(), false);
+      assert.deepEqual((await exportModule()).rows, []);
+      await recorder.locator('#include-osm').check();
+      const optional = await exportModule();
+      const blocked = new Set(reference.routes.filter(r => r.quality !== 'modeled').map(r => r.from + '|' + r.to));
+      assert.equal(blocked.size, 106);
+      assert.equal(optional.rows.length, 445);
+      assert.ok(optional.rows.every(r => r.sourceKind === 'osm_walk' && r.quality === 'modeled' &&
+        !blocked.has(r.from + '|' + r.to) && !(r.from === '문화관' && r.to === '정보과학관')));
+
+      await recorder.locator('#include-osm').uncheck();
+      await recorder.locator('#minutes').fill('12');
+      await recorder.locator('#evidence').fill('테스트에서만 사용한 가상 확인값');
+      await recorder.locator('#save').click();
+      const confirmed = (await exportModule()).rows;
+      assert.equal(confirmed.length, 1);
+      assert.deepEqual([confirmed[0].from, confirmed[0].to, confirmed[0].walkMinutes, confirmed[0].sourceKind],
+        ['문화관', '정보과학관', 12, 'naver_walk']);
+      await recorder.locator('#switch').click();
+      assert.equal(await recorder.locator('#minutes').inputValue(), '');
+      return optional.source;
+    } finally {
+      await recorder.close();
+    }
+  });
+  const {pick, checked} = actions(page, false);
+  const warning = page.getByRole('region', {name: '수업 사이 이동 안내'});
+  const tab = index => page.locator('[data-action="candidate"][data-value="' + index + '"]:visible');
+  await pick('데이터베이스응용');
+  await pick('운영체제');
+  await checked('compatible');
+  assert.equal(await warning.count(), 0);
+  await page.getByRole('link', {name: '생활 패턴 정하기'}).click();
+  assert.equal(await page.locator('#target-credits').inputValue(), '6');
+  assert.equal(await page.locator('#earliestStart').inputValue(), '600');
+  assert.equal(await page.locator('#latestEnd').inputValue(), '1080');
+  assert.deepEqual(await page.locator('[data-day]:checked').evaluateAll(items => items.map(item => Number(item.dataset.day))), [0, 1, 2, 3]);
+
+  const result = page.waitForResponse(r => r.url().endsWith('/api/candidates'), {timeout: 30000});
+  await page.getByRole('button', {name: '추천 시간표 보기'}).click();
+  const {candidates} = await (await result).json();
+  assert.equal(candidates.length, 3);
+  await page.locator('main[data-route="results"]').waitFor();
+  const attribution = warning.getByRole('link', {name: /OpenStreetMap contributors/});
+  assert.match(await warning.innerText(), /화요일 14:45 → 15:00 · 정보과학관 → 벤처중소기업센터/);
+  assert.match(await warning.innerText(), /이동이 빠듯해요/);
+  assert.match(await warning.innerText(), /쉬는 시간 15분 · 층 이동 포함 약 14분 · 공개 보행로 추정/);
+  assert.equal(await attribution.getAttribute('href'), 'https://www.openstreetmap.org/copyright');
+
+  await tab(1).click();
+  assert.match(await warning.innerText(), /목요일 14:45 → 15:00/);
+  await tab(2).click();
+  assert.equal(await warning.count(), 0);
+  await tab(0).click();
+  await warning.waitFor();
+  await page.locator('[data-action="confirm"]:visible').click();
+  await page.locator('#semester-form button[type="submit"]').click();
+  await page.locator('main[data-route="saved"]').waitFor();
+  const saved = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), storageKey);
+  assert.deepEqual(saved.semester.candidate.sections.map(s => s.id).sort(), candidates[0].sections.map(s => s.id).sort());
+  assert.equal(await warning.count(), 0);
+  await page.locator('nav a[href="#calendar"]:visible').first().click();
+  await page.locator('main[data-route="calendar"]').waitFor();
+  assert.equal(await warning.count(), 0);
   assert.deepEqual(errors, []);
 });

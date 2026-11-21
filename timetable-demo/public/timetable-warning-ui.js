@@ -40,6 +40,12 @@ export function candidateTravelNotice(sections) {
       const route = warning.fromBuilding+' → '+warning.toBuilding;
       const message = warning.kind === 'advisory' ? '쉬는 시간 '+warning.gapMinutes+'분이라 이동이 빠듯할 수 있어요.' :
         warning.kind === 'short' ? '이동시간이 약 '+Math.ceil(-warning.spareMinutes)+'분 부족해요.' : '이동이 빠듯해요.';
-      return '<li><strong>'+esc(when+' · '+route)+'</strong><p>'+esc(message)+'</p></li>';
+      let source = '';
+      if (warning.sourceKind === 'naver_walk') source = '네이버 지도 도보 확인값';
+      if (warning.sourceKind === 'osm_walk') {
+        source = '공개 보행로 추정 · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a>';
+      }
+      const detail = source ? '<p>쉬는 시간 '+warning.gapMinutes+'분 · 층 이동 포함 약 '+warning.estimatedMinutes+'분 · '+source+'</p>' : '';
+      return '<li><strong>'+esc(when+' · '+route)+'</strong><p>'+esc(message)+'</p>'+detail+'</li>';
     }).join('')+'</ul></section>';
 }

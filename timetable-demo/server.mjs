@@ -35,6 +35,7 @@ files['/calendar-display.mjs']=['calendar-display.mjs','text/javascript; charset
 files['/calendar-view.js']=['calendar-view.js','text/javascript; charset=utf-8'];
 files['/calendar.css']=['calendar.css','text/css; charset=utf-8'];
 files['/lms.css']=['lms.css','text/css; charset=utf-8'];
+files['/walking-route-times.mjs']=['walking-route-times.mjs','text/javascript; charset=utf-8'];
 const calendarAssets=new Map([
   ['calendar.js','all/global.js'], ['theme.js','themes/monarch/global.js'], ['ko.js','locales/ko/global.js'],
   ['skeleton.css','skeleton.css'], ['theme.css','themes/monarch/theme.css'], ['palette.css','themes/monarch/palettes/blue.css']

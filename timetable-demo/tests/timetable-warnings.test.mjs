@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {catalogVersion, getCourses} from '../catalog.mjs';
 import {checkCourseCompatibility} from '../course-compatibility.mjs';
 import {createTimetableServer} from '../server.mjs';
-import {travelWarnings} from '../public/travel-warnings.mjs';
+import {travelWarnings as evaluateTravel} from '../public/travel-warnings.mjs';
+import {combineWalkingRoutes} from '../public/campus-walking-routes.mjs';
 
 const scope = {term: '2026-2', department: 'AI소프트웨어학부'};
 const catalog = getCourses(scope);
@@ -101,6 +102,9 @@ const journey = (gap, from = fromRoom, to = toRoom) => [
   {meetings: [[4, 885 + gap, 960 + gap]], locations: [to]}
 ];
 
+const experience = [{from: '문화관', to: '정보과학관', walkMinutes: null, advisoryMaxGapMinutes: 15}];
+const travelWarnings = (sections, routes = experience) => evaluateTravel(sections, routes);
+
 test('실제 금요일 15분 경로를 경험 기반으로 안내하고 방향과 실측 우선순위를 지킨다', () => {
   const forensics = course('디지털포렌식개론').sections.find(s => s.id === 'ssu-2026-2-2150166901');
   const algorithm = course('알고리즘').sections.find(s => s.id === 'ssu-2026-2-2150163303');
@@ -153,4 +157,41 @@ test('요일별 강의실을 유지하고 온라인·동일 강의실·근거 �
   assert.deepEqual(travelWarnings(differentDays), []);
   const interveningOnline = [...journey(15), {meetings: [[4, 885, 900]], locations: ['온라인']}];
   assert.deepEqual(travelWarnings(interveningOnline), []);
+});
+
+test('지도 기록의 방향·출처 우선순위와 소예배실 별칭을 지킨다', () => {
+  const naver = {...route(12), sourceKind: 'naver_walk', checkedOn: '2026-11-20'};
+  const osm = {...route(11), sourceKind: 'osm_walk', quality: 'modeled'};
+  const real = route(13);
+  assert.deepEqual(combineWalkingRoutes(experience, [osm]), experience);
+  assert.deepEqual(combineWalkingRoutes(experience, [naver]), [naver]);
+  assert.deepEqual(combineWalkingRoutes([real], [naver]), [real]);
+  assert.deepEqual(combineWalkingRoutes([], [osm, naver]), [naver]);
+  assert.deepEqual(combineWalkingRoutes([], [naver, osm]), [naver]);
+  const installed = combineWalkingRoutes(experience, [naver, osm]);
+  const [warning] = travelWarnings(journey(15), installed);
+  assert.equal(warning.sourceKind, 'naver_walk');
+  assert.equal(warning.kind, 'tight');
+  assert.equal(warning.estimatedMinutes, 15);
+  assert.equal(warning.spareMinutes, 0);
+  assert.deepEqual(travelWarnings(journey(15, toRoom, fromRoom), installed), []);
+  assert.deepEqual(travelWarnings(journey(18), installed), []);
+  const chapel = {...naver, from: '한경직기념관'};
+  assert.equal(travelWarnings(journey(14, '한경직기념관 소예배실 08106', toRoom), [chapel])[0].estimatedMinutes, 14);
+});
+
+test('우회·접근점 주의 표시는 추정값을 제외하고 같은 방향의 확인값을 보존한다', () => {
+  const naver = {...route(9), sourceKind: 'naver_walk', checkedOn: '2026-11-20'};
+  const reverse = {...naver, from: naver.to, to: naver.from, walkMinutes: 8};
+  const older = {...naver, walkMinutes: 7, checkedOn: '2026-11-19'};
+  const newer = {...naver, walkMinutes: 10, checkedOn: '2026-11-21'};
+  assert.deepEqual(combineWalkingRoutes([naver], [older, reverse]), [naver, reverse]);
+  assert.deepEqual(combineWalkingRoutes([naver], [newer, reverse]), [newer, reverse]);
+
+  for (const quality of ['detour_review', 'shared_access', undefined]) {
+    const unverified = {...route(12), sourceKind: 'osm_walk', quality};
+    assert.deepEqual(combineWalkingRoutes([], [unverified]), []);
+    assert.deepEqual(travelWarnings(journey(0), [unverified]), []);
+    assert.deepEqual(combineWalkingRoutes([], [unverified, naver]), [naver]);
+  }
 });
