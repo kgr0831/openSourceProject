@@ -80,8 +80,9 @@ const server=http.createServer(async(req,res)=>{
       const scope={term:url.searchParams.get('term')??defaultRequest.term,department:url.searchParams.get('department')??defaultRequest.department};
       const selected=getCourses(scope);
       return reply(res,200,{courses:selected.map(({sections,...course})=>({...course,
+        offerings:sections.map(s=>({courseNumber:s.courseNumber,offeredBy:s.offeredBy,available:!s.unavailableReason})),
         facets:courseFacets(sections),sectionCount:sections.length,availableSectionCount:sections.filter(section=>section.meetings.length).length})),
-        defaultRequest:{...defaultRequest,...scope},catalogInfo:{...catalogInfo,...scope,
+        defaultRequest:{...defaultRequest,...scope},catalogInfo:{...catalogInfo,...scope,careerDataVersion:scheduler.careerDataVersion,
           majorCount:selected.filter(course=>course.kind==='major').length,generalCount:selected.filter(course=>course.kind==='general').length,
           selectedCourseCount:selected.length,selectedSectionCount:selected.reduce((count,course)=>count+course.sections.length,0),
           selectedUnavailableSectionCount:selected.reduce((count,course)=>count+course.sections.filter(section=>!section.meetings.length).length,0)}});
@@ -110,7 +111,7 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==='/api/career'){
       if(recommendationBusy||bridge.busy)throw new Error('추천을 생성 중입니다. 잠시 기다려 주세요.');
       recommendationBusy=true;
-      try{return reply(res,200,await evaluateCareer(body,bridge,scheduler))}finally{recommendationBusy=false}
+      try{return reply(res,200,await evaluateCareer(body,bridge,scheduler,{signal:controller.signal}))}finally{recommendationBusy=false}
     }
     if(url.pathname==='/api/connect')return reply(res,200,await bridge.connect());
     if(url.pathname==='/api/cancel')return reply(res,200,await bridge.cancelLogin());

@@ -31,7 +31,7 @@ const titles={start:'캠퍼스 시간표',courses:'과목 고르기',preferences
 const designScreen={results:'resultA','career-list':'career'};
 function current(){return state.options[state.active]}
 const scopeStorageKey='ssu-timetable-catalog-scope';
-function careerList(request=state.request){const list=store.data.careerRecommendations;return list&&list.term===request.term&&list.department===request.department&&list.catalogVersion===request.catalogVersion?list:null}
+function careerList(request=state.request){const list=store.data.careerRecommendations;return list&&list.term===request.term&&list.department===request.department&&list.catalogVersion===request.catalogVersion&&(list.source!=='course-evidence-ai'||list.careerDataVersion===state.catalogInfo.careerDataVersion)?list:null}
 function catalogControls(){
   const info=state.catalogInfo;if(!info.terms?.length)return '';
   const disabled=state.catalogBusy||state.careerBusy?'disabled':'';
@@ -254,11 +254,14 @@ function savedView(){
 }
 
 function careerGroups(list,selectable=false){
-  const groups=groupCareerCourses(list,selectable?state.courses.filter(c=>c.availableSectionCount!==0):state.courses);
+  const groups=groupCareerCourses(list,selectable?state.courses.filter(c=>c.availableSectionCount!==0):state.courses,{selectable});
   return '<div class="career-columns">'+['major','general'].map(kind=>'<section class="card"><h2>'+({major:'전공',general:'교양'}[kind])+' · '+groups[kind].length+'과목</h2><div class="stack compact">'+(groups[kind].map(c=>{
     const selected=state.request.requiredCourseIds.includes(c.id);
-    const copy='<strong>'+esc(c.name)+'</strong><small>'+c.credits+'학점 · '+(c.relevance==='high'?'관련성 높음':'관련성 보통')+'</small><p>'+esc(c.reason)+'</p>';
-    return selectable?'<button type="button" class="course-card '+(selected?'selected':'')+'" data-action="career-required" data-id="'+esc(c.id)+'" aria-pressed="'+selected+'"><span>'+copy+'</span><span>'+(selected?'✓ 필수 선택됨':'+ 꼭 듣기')+'</span></button>':'<article class="course-card"><div>'+copy+'</div></article>';
+    const basis={description:'설명 기반',reference:'이전 과목 설명 참고',name:'과목명 기반'}[c.evidenceType]||'과목명 기반';
+    const copy='<strong>'+esc(c.name)+'</strong><small>'+esc(c.department||'')+(c.credits!=null?' · '+c.credits+'학점':'')+' · '+(c.relevance==='high'?'관련성 높음':'관련성 보통')+'</small><small>'+basis+(!selectable&&list.source==='course-evidence-ai'?' · '+(c.availableNow?'현재 선택 학기·학과에서 조회 가능':'현재 선택 학기·학과에서 연결 가능한 분반 없음'):'')+'</small><p>'+esc(c.reason)+'</p>';
+    const sources=(c.sourceUrl||'').split(' ; ').filter(url=>/^https?:\/\//.test(url)).map(url=>'<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">공식 원문 확인</a>').join(' · ');
+    const detail=c.description&&!selectable?'<details><summary>과목 설명과 출처 보기</summary><p>'+esc(c.description)+'</p><small>'+esc(c.sourceName||'')+' · '+esc(c.sourceYear||'연도 미표기')+'</small><p>'+sources+'</p>'+(c.evidenceType==='reference'?'<p>이전 과목의 참고 설명입니다. 현재 과목 자체의 확정 설명이 아닙니다.</p>':'')+(c.reviewNote?.includes('오탈자검수 보류')?'<p>원문 일부 표현은 확인이 필요합니다.</p>':'')+'</details>':'';
+    return selectable?'<button type="button" class="course-card '+(selected?'selected':'')+'" data-action="career-required" data-id="'+esc(c.id)+'" aria-pressed="'+selected+'"><span>'+copy+'</span><span>'+(selected?'✓ 필수 선택됨':'+ 꼭 듣기')+'</span></button>':'<article class="course-card"><div>'+copy+detail+'</div></article>';
   }).join('')||'<p>관련 과목을 찾지 못했어요. 관련성이 불분명한 과목은 표시하지 않습니다.</p>')+'</div></section>').join('')+'</div>';
 }
 function careerRequiredPanel(){
@@ -268,16 +271,16 @@ function careerRequiredPanel(){
 function careerView(){
   return body(heading('어떤 진로를 생각하고 있나요?','희망 진로를 검색하고 관련 과목을 찾아보세요.')+catalogControls()+
     field('희망 진로','<textarea id="career-goal" maxlength="400" placeholder="예: 컴퓨터비전 개발자가 되고 싶어요">'+esc(state.careerGoal)+'</textarea>')+
-    '<p>진로와 후보 과목명만 AI에 전달해요.</p>'+link('Codex 연결 관리','ai')+
+    '<p>전체 과목에서 관련 후보를 찾고, 과목명·학과·공식 설명을 함께 살펴봐요. 설명이 없는 과목도 추천 대상에 포함해요.</p>'+link('Codex 연결 관리','ai')+
     button(state.careerBusy?'검색 중…':'희망진로 검색','career-evaluate','primary',state.careerBusy?'disabled':'')+
     link('저장된 진로 추천 과목 보기','career-list','secondary')+
-    '<small>과목명 기반 추천이며 실제 강의 내용·수강 자격을 보장하지 않습니다.</small>')+bottomNav('career-list');
+    '<small>진로와 공개된 과목 정보만 AI에 전달해요. 과거 자료는 현재 강의와 다를 수 있으며, 수강 자격은 학교에서 확인해 주세요.</small>')+bottomNav('career-list');
 }
 function careerListView(){
   const list=careerList();
   return body(heading('진로 추천 과목',list?'희망 진로: '+esc(list.goal):'이 학기·학과에 저장된 추천 과목이 없어요.')+catalogControls()+
     '<div class="career-list-actions">'+link('다른 희망진로 검색','career','secondary')+link('이번 학기에 들을 과목 고르기','courses','primary')+'</div>'+
-    (list?careerGroups(list)+'<small>'+esc(list.notice)+'</small>':'<p>홈의 희망진로 검색에서 관심 진로를 입력하면 전공·교양 추천 목록이 여기에 저장됩니다.</p>'+link('희망진로 검색하기','career','primary'))+
+    (list?(list.searchedCourseCount?'<p>전체 '+list.searchedCourseCount+'과목 검색 · 관련 후보 '+list.evaluatedCourseCount+'과목 검토</p>':'')+careerGroups(list)+'<small>'+esc(list.notice)+'</small>':'<p>홈의 희망진로 검색에서 관심 진로를 입력하면 전공·교양 추천 목록이 여기에 저장됩니다.</p>'+link('희망진로 검색하기','career','primary'))+
     '<p>한 학기에 모두 들을 필요는 없어요. 시간표 만들기에서 원하는 과목만 필수로 선택하세요.</p>','career-list-body')+bottomNav('career-list');
 }
 
@@ -687,7 +690,7 @@ async function act(action,el){
     case 'section':showSection(el.dataset.id);break;
     case 'section-calendar':{const events=store.data.events.filter(e=>e.courseId===el.dataset.id),upcoming=events.find(e=>e.date>=koreanToday())||events[0];if(upcoming)state.selectedDate=upcoming.date;closeDialog();go('calendar');break}
     case 'career-required':{
-      const groups=groupCareerCourses(careerList(),state.courses);
+      const groups=groupCareerCourses(careerList(),state.courses.filter(c=>c.availableSectionCount!==0),{selectable:true});
       if(![...groups.major,...groups.general].some(c=>c.id===el.dataset.id&&c.availableSectionCount!==0))break;
       toggleCourseSelection(el.dataset.id);break;
     }
@@ -698,7 +701,7 @@ async function act(action,el){
       const scope={term:state.request.term,department:state.request.department};
       state.careerBusy=true;render();
       try{
-        const result=await api('career',{goal,...scope},AbortSignal.timeout(150000));
+        const result=await api('career',{goal,...scope},AbortSignal.timeout(300000));
         if(goal!==state.careerGoal.trim())throw new Error('진로가 변경됐어요. 새 진로로 다시 분석해 주세요.');
         store.saveCareerList(result);
         go('career-list');

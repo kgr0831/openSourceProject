@@ -1,0 +1,142 @@
+[
+  {
+    "과목키": "0cf7e147b9391f72",
+    "과목명": "AI가속기",
+    "개설학과": "AI소프트웨어학부",
+    "수정전": "프로게서",
+    "수정후": "프로세서",
+    "수정횟수": 1,
+    "근거": "원문 오타 교정: GPU·TPU를 가리키는 프로세서의 표준 철자. 요람 이미지 437 확인",
+    "출처URL": "https://ai.ssu.ac.kr/guide/curriculum ; https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/761Q2JK12IK7"
+  },
+  {
+    "과목키": "0e211668531d3200",
+    "과목명": "프로그래밍기초2",
+    "개설학과": "AI소프트웨어학부",
+    "수정전": "파일 처리 능을",
+    "수정후": "파일 처리 등을",
+    "수정횟수": 1,
+    "근거": "요람 공개 디지털 본문 428: 파일 처리 / 등을 사용하는",
+    "출처URL": "https://ai.ssu.ac.kr/guide/curriculum ; https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/PZ6V8X3ADPNQ"
+  },
+  {
+    "과목키": "8729edf29fdddb7b",
+    "과목명": "확장현실디자인",
+    "개설학과": "글로벌미디어학부",
+    "수정전": "다릅니다",
+    "수정후": "다룹니다",
+    "수정횟수": 1,
+    "근거": "요람 공개 디지털 본문 423",
+    "출처URL": "https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/3XZELL7HYKV0"
+  },
+  {
+    "과목키": "01244d5239097933",
+    "과목명": "한국교회와사회",
+    "개설학과": "기독교학과",
+    "수정전": "본 과복의",
+    "수정후": "본 과목의",
+    "수정횟수": 1,
+    "근거": "요람 공개 디지털 본문 126",
+    "출처URL": "https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/BEAN3UED13QR"
+  },
+  {
+    "과목키": "e95538ce28811200",
+    "과목명": "프랑스소설",
+    "개설학과": "불어불문학과",
+    "수정전": "복적을",
+    "수정후": "목적을",
+    "수정횟수": 1,
+    "근거": "요람 공개 디지털 본문 146",
+    "출처URL": "https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/5MDMR49X8L0Q"
+  },
+  {
+    "과목키": "df55999e10bd9e73",
+    "과목명": "프랑스의이해",
+    "개설학과": "불어불문학과",
+    "수정전": "복적을",
+    "수정후": "목적을",
+    "수정횟수": 1,
+    "근거": "요람 공개 디지털 본문 30",
+    "출처URL": "https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/PTBW986TXQQV"
+  },
+  {
+    "과목키": "9f4a78be4b52fd58",
+    "과목명": "수리인공지능1",
+    "개설학과": "수학과",
+    "수정전": "인공지능(AT)",
+    "수정후": "인공지능(AI)",
+    "수정횟수": 1,
+    "근거": "요람 공개 디지털 본문 189",
+    "출처URL": "https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/V3LJ5PQPQKJP"
+  },
+  {
+    "과목키": "de926f9b1f3fe114",
+    "과목명": "해석개론2",
+    "개설학과": "수학과",
+    "수정전": "먹급수",
+    "수정후": "멱급수",
+    "수정횟수": 1,
+    "근거": "요람 공개 디지털 본문 189",
+    "출처URL": "https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/V3LJ5PQPQKJP"
+  },
+  {
+    "과목키": "b1e31a4508a6b1b7",
+    "과목명": "디지털신호처리",
+    "개설학과": "전기공학부",
+    "수정전": "다릅니다",
+    "수정후": "다룹니다",
+    "수정횟수": 1,
+    "근거": "요람 공개 디지털 본문 365",
+    "출처URL": "https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/AYAS3R10VYL4"
+  },
+  {
+    "과목키": "01fba158f5064349",
+    "과목명": "인공지능개론",
+    "개설학과": "전기공학부",
+    "수정전": "다릅니다",
+    "수정후": "다룹니다",
+    "수정횟수": 1,
+    "근거": "요람 공개 디지털 본문 364",
+    "출처URL": "https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/S0PJLPKL1QFO"
+  },
+  {
+    "과목키": "de1bdb397f8612c5",
+    "과목명": "보험수리학1",
+    "개설학과": "정보통계·보험수리학과",
+    "수정전": "교과복이다",
+    "수정후": "교과목이다",
+    "수정횟수": 1,
+    "근거": "요람 공개 디지털 본문 204",
+    "출처URL": "https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/JLSMNYF4XRTR"
+  },
+  {
+    "과목키": "c814b8c07ac59e79",
+    "과목명": "공공부문성과관리의이론과실제",
+    "개설학과": "행정학부",
+    "수정전": "복적으로",
+    "수정후": "목적으로",
+    "수정횟수": 1,
+    "근거": "요람 공개 디지털 본문 239",
+    "출처URL": "https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/JMJS8THG5ZNA"
+  },
+  {
+    "과목키": "5ff5c264731b1b9c",
+    "과목명": "관리회계",
+    "개설학과": "회계학과",
+    "수정전": "학습힌다",
+    "수정후": "학습한다",
+    "수정횟수": 1,
+    "근거": "요람 이미지 306: 내용을 학습한다 확인",
+    "출처URL": "https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/S8IUA0DKIDZM"
+  },
+  {
+    "과목키": "dc873a6511e5f924",
+    "과목명": "회계원리",
+    "개설학과": "회계학과",
+    "수정전": "과복",
+    "수정후": "과목",
+    "수정횟수": 3,
+    "근거": "요람 공개 디지털 본문 306: 이 과목은 모든 회계학 과목의 선수과목이다",
+    "출처URL": "https://ibook.ssu.ac.kr/Viewer/getPageWords/W0U312FZEW2C/S8IUA0DKIDZM"
+  }
+]
