@@ -1,5 +1,5 @@
 import {groupCareerCourses,toggleRequiredCourse} from './career-model.mjs';
-import {hardConditions,updateHardCondition,relaxationDialog,relaxationPolicy,changesNotice} from './solver-ui.js';
+import {hardConditions,updateHardCondition,relaxationDialog,relaxationPolicy,changesNotice,emptyGuidanceView} from './solver-ui.js';
 import {createPlannerStore} from './planner.js';
 import {calendarEvents} from './calendar-logic.mjs';
 import {calendarDateLabel,calendarPeriodLabel,calendarViews,calendarWeekBounds,eventKindLabel,koreanDate,stepCalendarDate,toCalendarEvents} from './calendar-display.mjs';
@@ -8,16 +8,23 @@ import {setupLms} from './lms.js';
 import {lmsTimeLabel} from './lms-calendar.mjs';
 import {kindLabels,exportCalendar,addDays,koreanToday,sectionLocation,timeText,timeValue} from './planner-core.mjs';
 import {esc,icon,button,link,heading,info,field,toggle,tabs,footer,timetable,layoutTimetables,layoutTabs,animateElements,dayNames,longestDay} from './ui.js';
+import {courseCompatibilityNotice,candidateTravelNotice} from './timetable-warning-ui.js';
+import {courseFilterControls,selectedCourseTimes} from './course-flow-ui.js';
+import {courseFilterOptions,matchesCourseFilters} from './course-filters.mjs';
+import {courseCreditPlan,defaultCreditRanges,selectedCredits} from './course-credits.mjs';
 
 const $=id=>document.getElementById(id);
+const emptyCourseFilters=()=>({completion:[],credits:[],years:[]});
 const store=createPlannerStore({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)});
 const state={
   courses:[],catalogInfo:{},catalogBusy:false,request:null,options:[],active:0,query:'',kind:'major',showAll:false,route:'start',
+  courseFilters:emptyCourseFilters(),creditChoice:{mode:'auto'},creditFeedback:{},
   careerGoal:store.data.careerRecommendations?.goal||'',careerBusy:false,selectedDate:koreanToday(),selectedMinute:null,
   calendarMode:'week',showCalendarClasses:true,eventOriginal:null,eventDraft:null,error:'',diagnostics:[],busy:false,controller:null,
-  source:'rules',aiStatus:null,aiMessage:'',noteTitle:'',noteBody:'',lastMode:'rules',resultRequest:null,interpretation:null,lmsCalendar:null
+  source:'rules',aiStatus:null,aiMessage:'',noteTitle:'',noteBody:'',lastMode:'rules',resultRequest:null,interpretation:null,lmsCalendar:null,emptyGuidance:null
 };
 let toastTimer,pollTimer,requestVersion=0,lmsReady=false,pendingCalendar=null,calendarWidget=null;
+let courseTimeCheck=null;
 const allEvents=()=>[...calendarEvents(store.data.events),...(state.lmsCalendar?.events||[])];
 const calendarOptions=()=>({externalEvents:state.lmsCalendar?.events||[]});
 const titles={start:'캠퍼스 시간표',courses:'과목 고르기',preferences:'생활 패턴 정하기',advanced:'세부 선호',results:'추천 시간표',saved:'내 시간표',career:'희망진로 검색','career-list':'진로 추천 과목',calendar:'학기 일정',export:'캘린더 내보내기',experience:'수강 경험',record:'나의 수강 기록',empty:'추천 결과',loading:'시간표 찾는 중',error:'연결 확인',ai:'AI에게 요청하기'};
@@ -41,7 +48,8 @@ async function changeCatalog(scope){
     const meta=await api('meta?'+new URLSearchParams(scope));
     state.courses=meta.courses;state.catalogInfo=meta.catalogInfo;
     Object.assign(state.request,scope,{requiredCourseIds:[],preferredCourseIds:[],excludedCourseIds:[],lockedSectionIds:[],excludedSectionIds:[],catalogVersion:meta.defaultRequest.catalogVersion});
-    state.options=[];state.resultRequest=null;state.retryPayload=null;state.interpretation=null;state.solver=null;state.query='';state.showAll=false;
+    state.options=[];state.resultRequest=null;state.retryPayload=null;state.interpretation=null;state.solver=null;state.emptyGuidance=null;state.query='';state.showAll=false;state.courseFilters=emptyCourseFilters();
+    syncCreditPlan();
     try{localStorage.setItem(scopeStorageKey,JSON.stringify(scope))}catch{flash('학기·학과 선택을 브라우저에 저장하지 못했어요.',true)}
     flash('학기·학과를 변경했어요. 듣고 싶은 과목을 다시 선택해 주세요.');
   }catch(error){flash(error.message,true)}finally{state.catalogBusy=false;render()}
@@ -87,33 +95,114 @@ function startView(){
 }
 function courseList(){
   const r=state.request,q=state.query.trim().toLowerCase();
-  let list=state.courses.filter(c=>(state.kind==='all'||c.kind===state.kind)&&[c.name,c.topic,c.classification].join(' ').toLowerCase().includes(q));
+  const filtered=Object.values(state.courseFilters).some(values=>values.length);
+  let list=state.courses.filter(c=>(state.kind==='all'||c.kind===state.kind)&&matchesCourseFilters(c,state.courseFilters)&&
+    [c.name,c.topic,c.classification].join(' ').toLowerCase().includes(q));
   list.sort((a,b)=>Number(r.requiredCourseIds.includes(b.id))-Number(r.requiredCourseIds.includes(a.id))||Number(b.availableSectionCount!==0)-Number(a.availableSectionCount!==0));
-  const count=list.length;list=list.slice(0,state.showAll||q?list.length:3);
+  const count=list.length,expanded=state.showAll||Boolean(q)||filtered;
+  if(!expanded)list=list.slice(0,3);
   return list.map(c=>{
     const selected=r.requiredCourseIds.includes(c.id),excluded=r.excludedCourseIds.includes(c.id),unavailable=c.availableSectionCount===0;
     return '<button class="course-card '+(selected?'selected':'')+'" data-action="course" data-id="'+esc(c.id)+'" aria-pressed="'+selected+'" '+(unavailable||state.catalogBusy?'disabled':'')+'><span class="course-symbol '+(c.kind==='major'?'blue':'sage')+'" aria-hidden="true">'+(c.kind==='major'?'전공':'교양')+'</span><span class="course-copy"><strong>'+esc(c.name)+'</strong><small>'+esc(c.classification)+' · '+c.credits+'학점'+(c.year?' · '+c.year+'학년':'')+(c.sectionCount?' · '+c.availableSectionCount+'/'+c.sectionCount+'개 분반 시간 등록':'')+(excluded?' · 추천 제외':'')+'</small>'+(unavailable?'<small>'+esc((c.unavailableReasons||['강의시간 확인 필요']).join(' · '))+'</small>':'')+'</span><span class="selection-mark '+(selected?'checked':'')+'">'+(selected?icon('courses','imgCheck'):'+')+'</span></button>';
-  }).join('')+(count===0?'<p class="empty-copy">검색 결과가 없어요. 다른 과목명으로 찾아보세요.</p>':'')+(!state.showAll&&!q&&count>3?button('다른 과목 '+(count-3)+'개 보기','more-courses','quiet'):'');
+  }).join('')+(count===0?'<p class="empty-copy">'+(filtered?'조건에 맞는 과목이 없어요. 필터나 검색어를 바꿔 보세요.':'검색 결과가 없어요. 다른 과목명으로 찾아보세요.')+'</p>':'')+(!expanded&&count>3?button('다른 과목 '+(count-3)+'개 보기','more-courses','quiet'):'');
 }
-function selectionSummary(){const list=state.courses.filter(c=>state.request.requiredCourseIds.includes(c.id));return list.length?list.length+'과목 · '+list.reduce((n,c)=>n+c.credits,0)+'학점 선택':'과목을 고르지 않으면 조건에 맞춰 추천해요'}
+function selectionSummary(){
+  const {count,total}=selectedCredits(state.courses,state.request.requiredCourseIds);
+  return count?count+'과목 · '+total+'학점 선택':'과목을 고르지 않으면 조건에 맞춰 추천해요';
+}
+function syncCreditPlan(commitGoal=true){
+  const request=state.request,choice=state.creditChoice;
+  const selected=selectedCredits(state.courses,request.requiredCourseIds);
+  state.creditFeedback=courseCreditPlan(selected,choice,request.credits);
+  const {ranges,raisedTo}=state.creditFeedback;
+  if(ranges)request.credits=ranges;
+  if(commitGoal&&raisedTo!==undefined){
+    state.creditChoice={mode:'goal',value:raisedTo,raisedFrom:choice.raisedFrom??choice.value};
+  }
+}
+function toggleCourseSelection(id){
+  state.request=toggleRequiredCourse(state.request,id);
+  syncCreditPlan();
+  render();
+}
+function renderSelectedCourseTimes(){
+  const preview=$('selected-course-times');
+  if(!preview)return;
+  const open=new Set([...preview.querySelectorAll('details[open]')].map(detail=>detail.dataset.courseTime));
+  preview.innerHTML=selectedCourseTimes(courseTimeCheck,state.request,open);
+}
+function renderCourseTimeChecks(){
+  const region=$('course-time-check'),result=courseTimeCheck?.result;
+  if(region){
+    region.dataset.status=result?.status??(courseTimeCheck?'pending':'idle');
+    region.innerHTML=courseCompatibilityNotice(result,state.request.requiredCourseIds);
+    $('course-time-shortcut').innerHTML=result?.status==='conflict'
+      ? button('시간 충돌 확인','show-course-conflict','course-time-shortcut') : '';
+  }
+  renderSelectedCourseTimes();
+}
+function syncCourseCompatibility(){
+  const request=['courses','preferences','advanced'].includes(state.route)&&!state.catalogBusy?state.request:null;
+  if(!request||(!request.requiredCourseIds.length&&!request.lockedSectionIds.length)){
+    courseTimeCheck?.controller.abort();
+    courseTimeCheck=null;
+    return;
+  }
+  const {term,department,catalogVersion,requiredCourseIds,lockedSectionIds,excludedSectionIds}=request;
+  const payload={term,department,catalogVersion,requiredCourseIds,lockedSectionIds,excludedSectionIds,includeSections:true};
+  const key=JSON.stringify(payload);
+  if(courseTimeCheck?.key===key){renderCourseTimeChecks();return}
+  courseTimeCheck?.controller.abort();
+  const check={key,controller:new AbortController(),result:null};
+  courseTimeCheck=check;
+  renderCourseTimeChecks();
+  api('course-compatibility',payload,AbortSignal.any([check.controller.signal,AbortSignal.timeout(5000)]))
+    .catch(()=>({status:'error'}))
+    .then(result=>{
+      if(courseTimeCheck!==check)return;
+      check.result=result;
+      renderCourseTimeChecks();
+    });
+}
 function coursesView(){
   return body(heading('꼭 듣고 싶은 과목부터','필수 과목은 유지하고, 나머지는 추천받아요.')+catalogControls()+careerRequiredPanel()+
     '<label class="sr-only" for="course-search">과목명으로 검색</label><input id="course-search" type="search" placeholder="과목명으로 검색" value="'+esc(state.query)+'">'+
-    tabs([['all','전체'],['major','전공'],['general','교양']],state.kind,'course-kind')+'<div id="course-list" class="stack compact">'+courseList()+'</div>'+(state.request.preferredCourseIds.length?'<div class="interest-box"><strong>우선 살펴볼 관심 과목</strong><div class="course-chips">'+state.request.preferredCourseIds.map(id=>button(esc(state.courses.find(c=>c.id===id)?.name)+' ×','remove-interest','interest-chip','data-id="'+id+'" aria-label="'+esc(state.courses.find(c=>c.id===id)?.name)+' 관심 해제"')).join('')+'</div><small>필수 과목과 시간 조건에 맞으면 우선 추천해요.</small></div>':'')+link('어떤 과목을 들을지 고민이라면','career')+
+    tabs([['all','전체'],['major','전공'],['general','교양']],state.kind,'course-kind')+
+    courseFilterControls(courseFilterOptions(state.courses),state.courseFilters,state.catalogBusy)+
+    '<div><div id="course-time-check" role="status" tabindex="-1" data-status="idle"></div><div id="course-list" class="stack compact">'+courseList()+'</div></div>'+(state.request.preferredCourseIds.length?'<div class="interest-box"><strong>우선 살펴볼 관심 과목</strong><div class="course-chips">'+state.request.preferredCourseIds.map(id=>button(esc(state.courses.find(c=>c.id===id)?.name)+' ×','remove-interest','interest-chip','data-id="'+id+'" aria-label="'+esc(state.courses.find(c=>c.id===id)?.name)+' 관심 해제"')).join('')+'</div><small>필수 과목과 시간 조건에 맞으면 우선 추천해요.</small></div>':'')+link('어떤 과목을 들을지 고민이라면','career')+
     '<details class="disclosure"><summary>추천에서 제외할 과목</summary><div class="exclude-list">'+state.courses.map(c=>'<label><input type="checkbox" data-exclude="'+esc(c.id)+'" '+(state.request.excludedCourseIds.includes(c.id)?'checked':'')+'>'+esc(c.name)+'</label>').join('')+'</div></details>','compact')+
-    footer(link('생활 패턴 정하기','preferences','primary'),'<span id="selection-summary">'+selectionSummary()+'</span>');
+    footer(link('생활 패턴 정하기','preferences','primary'),'<span id="selection-summary">'+selectionSummary()+'</span><span id="course-time-shortcut"></span>');
 }
 function timeOptions(value){return [...new Set([value,...Array.from({length:49},(_,i)=>i*30)])].sort((a,b)=>a-b).map(m=>'<option value="'+m+'" '+(m===value?'selected':'')+'>'+timeText(m)+'</option>').join('')}
+const creditValue=value=>Number.isFinite(value)?value:'';
+function creditRangesSummary(){
+  const {total,major,general}=state.request.credits;
+  const label=range=>!Number.isFinite(range.min)||!Number.isFinite(range.max)?'미입력':range.min===range.max?range.min:range.min+'~'+range.max;
+  return (total.min!==total.max?'총 '+label(total)+' · ':'')+'전공 '+label(major)+' · 교양 '+label(general);
+}
+function creditFeedback(){
+  return '<p id="credit-check" class="credit-feedback" role="status">'+esc(state.creditFeedback.message??'')+'</p>';
+}
+function updateCreditFeedback(){
+  const summary=$('credit-ranges-summary'),recommendButton=$('recommend-timetable');
+  if(summary)summary.textContent=creditRangesSummary();
+  if(recommendButton)recommendButton.disabled=Boolean(state.creditFeedback.blocked);
+  $('credit-check').textContent=state.creditFeedback.message??'';
+}
 function preferencesView(){
   const r=state.request;
+  const goal=state.creditChoice.mode==='goal'?state.creditChoice.value:r.credits.total.min;
+  const courseTimes=r.requiredCourseIds.length||r.lockedSectionIds.length
+    ? '<section class="selected-course-times" aria-labelledby="course-times-heading"><h2 id="course-times-heading">선택 과목 수업시간</h2><div id="selected-course-times"></div></section>' : '';
   return body(heading('어떤 한 주가 편한가요?')+
-    field('이번 학기 목표 학점','<div class="credit-target"><input aria-label="목표 학점" id="target-credits" type="number" step="0.5" min="0.5" max="24" value="'+r.credits.total.min+'"><strong>학점</strong><span>전공 '+r.credits.major.min+' · 교양 '+r.credits.general.min+'</span></div>')+
+    '<div>'+field('이번 학기 목표 학점','<div class="credit-target"><input aria-label="목표 학점" aria-describedby="credit-ranges-summary credit-check" id="target-credits" type="number" step="0.5" min="0.5" max="24" value="'+creditValue(goal)+'"><strong>학점</strong><span id="credit-ranges-summary">'+creditRangesSummary()+'</span></div>')+creditFeedback()+'</div>'+
     '<fieldset class="field"><legend>등교할 수 있는 요일</legend><div class="day-picker">'+dayNames.map((d,i)=>'<label><input type="checkbox" data-day="'+i+'" '+(r.allowedDays.includes(i)?'checked':'')+'><span>'+(r.allowedDays.includes(i)?'✓ ':'')+d+'</span></label>').join('')+'</div><small>선택하지 않은 요일에는 수업을 넣지 않아요.</small></fieldset>'+
     field('수업 가능한 시간','<div class="time-range">'+icon('preferences','imgClock')+'<select id="earliestStart" aria-label="수업 시작 가능 시간">'+timeOptions(r.earliestStart)+'</select><span>~</span><select id="latestEnd" aria-label="수업 종료 한도">'+timeOptions(r.latestEnd)+'</select></div>')+
+    courseTimes+
     toggle('compact','가능하면 공강 시간을 줄여 주세요',r.preferences.compact)+toggle('lunch','점심시간을 확보하고 싶어요',r.preferences.lunch)+link('더 세밀하게 설정하기','advanced')+link('문장으로 요청하고 싶다면','ai'),'compact')+
-    footer(button('추천 시간표 보기','recommend'),'조건은 언제든 다시 바꿀 수 있어요');
+    footer(button('추천 시간표 보기','recommend','primary','id="recommend-timetable" '+(state.creditFeedback.blocked?'disabled':'')),'조건은 언제든 다시 바꿀 수 있어요');
 }
-function creditFields(){return ['total','major','general'].map((k,i)=>'<div class="credit-range"><span>'+['총 학점','전공','교양'][i]+'</span>'+['min','max'].map((b,j)=>(j?'<span>~</span>':'')+'<input type="number" step="0.5" min="'+(k==='total'?0.5:0)+'" max="24" data-credit="'+k+'" data-bound="'+b+'" aria-label="'+['총 학점','전공','교양'][i]+(j?' 최대':' 최소')+'" value="'+state.request.credits[k][b]+'">').join('')+'</div>').join('')}
+function creditFields(){return ['total','major','general'].map((k,i)=>'<div class="credit-range"><span>'+['총 학점','전공','교양'][i]+'</span>'+['min','max'].map((b,j)=>(j?'<span>~</span>':'')+'<input type="number" step="0.5" min="'+(k==='total'?0.5:0)+'" max="24" data-credit="'+k+'" data-bound="'+b+'" aria-label="'+['총 학점','전공','교양'][i]+(j?' 최대':' 최소')+'" value="'+creditValue(state.request.credits[k][b])+'">').join('')+'</div>').join('')}
 function advancedView(){
   const r=state.request;
   return body(heading('조금 더 나답게','추천 기준과 꼭 필요한 조건을 정해요.')+hardConditions(r)+
@@ -121,7 +210,7 @@ function advancedView(){
     toggle('breaks','연강을 줄이고 싶어요',r.preferences.breaks,'수업 사이 30분 이상 여유를 선호해요.')+
     toggle('lunch','점심시간 확보',r.preferences.lunch,'12시부터 14시 사이에 1시간을 비워요.')+
     toggle('fewDays','등교일 줄이기',r.preferences.fewDays)+toggle('late','오전 수업 피하기',r.preferences.late)+toggle('friday','금요일 공강 선호',r.preferences.friday)+toggle('travel','건물 이동 줄이기',r.preferences.travel)+
-    '<details class="disclosure"><summary>학점 범위 직접 설정</summary><div class="stack compact">'+creditFields()+'<small>같은 숫자를 넣으면 정확히 맞춰요.</small></div></details>'+
+    '<div><details class="disclosure"><summary>학점 범위 직접 설정</summary><div class="stack compact">'+creditFields()+'<small>같은 숫자를 넣으면 정확히 맞춰요.</small></div></details>'+creditFeedback()+'</div>'+
     '<div class="card muted"><strong>교수·강의평으로 고르기</strong><p>확인할 수 있는 강의 정보가 생기면<br>과목 상세에서 제공할 예정이에요.</p></div>')+footer(link('선호 저장하기','preferences','primary'),'필수 조건 안에서 선호를 반영해요');
 }
 function candidateTabs(){return tabs(state.options.map((c,i)=>[i,c.strategy||'추천 '+(i+1)]),state.active,'candidate')}
@@ -139,7 +228,7 @@ function resultsView(){
   const flags='✓ 필수 '+applied.requiredCourseIds.length+'과목 포함'+(!c.metrics.dayList.includes(4)?'　✓ 금요일 공강':'');
   const summary='<div class="metrics">'+[[c.credits+'학점','이번 학기'],[c.metrics.days+'일','등교'],[timeText(earliest),'첫 수업']].map(([v,l])=>'<div><strong>'+v+'</strong><span>'+l+'</span></div>').join('')+'</div>';
   return body('<div class="desktop-heading">'+heading('나에게 맞는 한 주를 골라요','필수 과목과 가능한 시간을 만족하는 추천안이에요.')+'</div><div class="mobile-only">'+heading('이런 한 주는 어때요?')+'</div>'+
-    '<div class="compare-layout"><div class="schedule-main"><div class="mobile-only">'+candidateTabs()+summary+'</div><div class="desktop-only table-tools"><h2>'+esc(c.strategy)+'</h2><span class="chip">'+c.credits+'학점 · 등교 '+c.metrics.days+'일</span></div><div class="timetable-surface">'+timetable(c)+'</div>'+
+    '<div class="compare-layout"><div class="schedule-main"><div class="mobile-only">'+candidateTabs()+summary+'</div><div class="desktop-only table-tools"><h2>'+esc(c.strategy)+'</h2><span class="chip">'+c.credits+'학점 · 등교 '+c.metrics.days+'일</span></div>'+candidateTravelNotice(c.sections)+'<div class="timetable-surface">'+timetable(c)+'</div>'+
     changesNotice(c)+'<div class="recommendation-reason"><p class="accent-text">'+flags+'</p><p>'+reason(c)+'</p>'+(c.metrics.lunchMissedDays?'<small>점심 1시간을 확보하지 못한 날이 '+c.metrics.lunchMissedDays+'일 있어요.</small>':'')+'</div>'+link('조건 다시 조정하기','preferences')+
     '<details class="disclosure"><summary>과목과 추천 이유 자세히</summary>'+(c.careerAssessment?'<p>희망 진로: '+esc(c.careerAssessment.goal)+'</p><small>'+esc(c.careerAssessment.notice)+'</small>':'')+'<p>'+esc(c.aiReason||'필수 조건을 지킨 유효 후보 중 서로 다른 시간표를 골랐어요.')+'</p>'+c.sections.map(s=>'<p>'+esc(s.name)+' · '+s.credits+'학점'+(c.careerAssessment?.evaluations.find(e=>e.courseId===s.courseId&&e.relevance!=='uncertain')?'<br>'+esc(c.careerAssessment.evaluations.find(e=>e.courseId===s.courseId).reason):'')+'</p>').join('')+'<p>'+esc(c.solverResult?.ranking_proven?'선택한 기준에서 우선순위를 확인한 결과예요.':'시간 안에 찾은 결과예요. 더 좋은 조합이 있을 수 있어요.')+'</p>'+'<p>적용 조건: '+applied.allowedDays.map(d=>dayNames[d]).join('·')+' / '+timeText(applied.earliestStart)+'–'+timeText(applied.latestEnd)+' / 총 '+applied.credits.total.min+'–'+applied.credits.total.max+'학점</p>'+(state.interpretation?.summary?'<p>'+esc(state.interpretation.summary)+'</p>':'')+(state.interpretation?.unsupported?.length?'<p>반영하지 못한 요청: '+state.interpretation.unsupported.map(esc).join(', ')+'</p>':'')+'<small>'+esc(state.catalogInfo.notice||'')+'</small></details></div>'+
     '<aside class="comparison-side desktop-only"><h2>나에게 중요한 기준</h2>'+state.options.map(comparisonCard).join('')+
@@ -329,7 +418,15 @@ function recordView(){
     field('이 조합을 고른 이유','<textarea name="body" id="note-body" required maxlength="600" rows="6" placeholder="수업을 고른 이유와 기대하는 점을 자유롭게 적어 보세요.">'+esc(state.noteBody)+'</textarea>')+'<p class="form-error" id="record-error" role="alert"></p></form>')+
     footer(button('내 기록 저장하기','save-record','primary',c?'':'disabled'),'다른 사람에게 공개되지 않아요');
 }
-function emptyView(){const infeasible=state.solver?.original_status==='INFEASIBLE';return body('<div class="state-illustration">'+icon('empty','imgSearch')+'</div>'+heading(infeasible?'조건을 조금만 바꿔 볼까요?':'조금 더 찾아볼까요?',infeasible?'현재 필수 조건을 모두 만족하는 시간표가 없어요.':'시간 안에 결과를 찾지 못했어요. 다시 시도할 수 있어요.')+'<div class="card">'+state.diagnostics.map(d=>'<p>'+esc(d)+'</p>').join('')+'</div>'+(infeasible&&state.lastMode!=='alternative'?button('허용할 변경 범위 고르기','relax-options','secondary'):button('다시 찾아보기','retry','secondary')))+footer(link('조건 조정하기','preferences','primary'))}
+function emptyView(){
+  const infeasible=state.solver?.original_status==='INFEASIBLE';
+  return body('<div class="state-illustration">'+icon('empty','imgSearch')+'</div>'+
+    heading(infeasible?'조건을 조금만 바꿔 볼까요?':'조금 더 찾아볼까요?',infeasible?'현재 필수 조건을 모두 만족하는 시간표가 없어요.':'시간 안에 결과를 찾지 못했어요. 다시 시도할 수 있어요.')+
+    '<div class="card">'+state.diagnostics.map(d=>'<p>'+esc(d)+'</p>').join('')+'</div>'+
+    (infeasible&&state.emptyGuidance?emptyGuidanceView(state.emptyGuidance):'')+
+    (infeasible&&state.lastMode!=='alternative'?button('허용할 변경 범위 고르기','relax-options','secondary'):button('다시 찾아보기','retry','secondary')))+
+    footer(link('조건 조정하기','preferences','primary'));
+}
 function loadingView(){return body('<div class="state-illustration loading-symbol">'+icon('loading','imgSpark')+'</div>'+heading('나에게 맞는 한 주를 찾고 있어요','과목이 겹치지 않는지 확인하고<br>생활 패턴에 맞는 조합을 비교해요.')+'<div class="loading-line" role="progressbar" aria-label="추천 생성 중"></div><p class="muted center">'+(state.lastMode==='ai'?'AI가 요청을 해석하고 이유를 정리하고 있어요.':'유효한 시간표를 비교하고 있어요.')+'</p>')+footer(link('조건으로 돌아가기','preferences','secondary'))}
 function errorView(){return body('<div class="state-illustration">'+icon('error','imgAlert')+'</div>'+heading('잠시 확인이 필요해요',esc(state.error||'다시 시도하거나 조건을 확인해 주세요.'))+info('입력한 조건은 그대로예요','설정을 바꾸지 않고 다시 시도할 수 있어요.',icon('error','imgGrid')))+footer(button('다시 시도하기','retry')+link('조건 확인하기','preferences','secondary'))}
 function aiView(){
@@ -353,6 +450,7 @@ function render(motion='none'){
   calendarWidget=null;
   const plannerScreen=['saved','calendar'].includes(state.route)?' planner-screen':'';
   $('app').innerHTML='<div class="app-shell">'+sidebar()+'<div class="workspace"><header class="desktop-topbar"><span>'+semesterLabel()+'</span><span class="user-label">나의 캠퍼스 '+icon('desktopSaved','imgUser')+'</span></header><main id="content" class="screen '+(wide?'wide':'')+plannerScreen+'" data-route="'+state.route+'">'+renderHeader()+content+'</main></div></div>';
+  syncCourseCompatibility();
   if($('lms-slot')){$('lms-slot').append(lmsHost);lmsHost.hidden=false}
   if($('semester-calendar'))mountSemesterCalendar();
   layoutTimetables();layoutTabs(sameRoute?previousTabs:new Map());
@@ -377,6 +475,10 @@ function routeChanged(){
 }
 async function recommend(mode='rules',payload){
   if(state.busy||state.catalogBusy)return;
+  if((mode==='rules'||mode==='ai')&&state.creditFeedback.blocked){
+    flash(state.creditFeedback.message,true);return;
+  }
+  state.emptyGuidance=null;
   state.lastMode=mode;if(payload)state.retryPayload=payload;else if(!['relax','alternative'].includes(mode))state.retryPayload=null;state.busy=true;const version=++requestVersion;state.controller=new AbortController();
   go('loading');
   const timeout=setTimeout(()=>state.controller?.abort(),mode==='ai'?240000:30000);
@@ -384,7 +486,17 @@ async function recommend(mode='rules',payload){
     const route=({ai:'recommend',relax:'relax',alternative:'alternatives'})[mode]||'candidates';
     const result=await api(route,payload||state.retryPayload||state.request,state.controller.signal);
     if(version!==requestVersion)return;
-    if(!['relax','alternative'].includes(mode))state.request=result.request;state.solver=result.solver;state.resultRequest=structuredClone(result.request);state.interpretation=result.interpretation||null;state.diagnostics=result.diagnostics||[];
+    if(!['relax','alternative'].includes(mode)){
+      const previous=state.request;
+      state.request=result.request;
+      if(mode==='ai'&&(JSON.stringify(previous.credits)!==JSON.stringify(result.request.credits)||
+        JSON.stringify([...previous.requiredCourseIds].sort())!==JSON.stringify(result.request.requiredCourseIds))){
+        state.creditChoice={mode:'ranges'};
+        syncCreditPlan();
+      }
+    }
+    state.solver=result.solver;state.resultRequest=structuredClone(result.request);state.interpretation=result.interpretation||null;state.diagnostics=result.diagnostics||[];
+    state.emptyGuidance=result.emptyGuidance??null;
     state.options=mode==='ai'&&result.recommendations?.length?result.recommendations.map((r,i)=>({...result.candidates.find(c=>c.id===r.id),strategy:'AI 추천 '+(i+1),aiReason:r.reason})):result.candidates;
     if(careerList(result.request))for(const c of state.options)c.careerAssessment=structuredClone(careerList(result.request));
     state.active=0;state.source=result.source||'rules';state.busy=false;go(state.options.length?'results':'empty');
@@ -525,13 +637,36 @@ async function act(action,el){
   switch(action){
     case 'back':back();break;
     case 'new':go('courses');break;
-    case 'course':state.request=toggleRequiredCourse(state.request,el.dataset.id);render();break;
+    case 'course':toggleCourseSelection(el.dataset.id);break;
+    case 'show-course-conflict':$('course-time-check').focus();break;
+    case 'remove-conflicting-course':
+      if(state.request.requiredCourseIds.includes(el.dataset.id)){
+        toggleCourseSelection(el.dataset.id);$('course-search').focus();
+      }
+      break;
     case 'course-kind':state.kind=el.dataset.value;render('list');break;
+    case 'course-filter':{
+      const {id,value}=el.dataset,values=state.courseFilters[id];
+      state.courseFilters[id]=values.includes(value)?values.filter(item=>item!==value):[...values,value];
+      render('list');break;
+    }
+    case 'reset-course-filters':
+      state.courseFilters=emptyCourseFilters();state.kind='all';state.query='';state.showAll=false;
+      render('list');break;
     case 'more-courses':state.showAll=true;render('list');break;
     case 'remove-interest':state.request.preferredCourseIds=state.request.preferredCourseIds.filter(id=>id!==el.dataset.id);render();break;
     case 'candidate':if(state.active!==Number(el.dataset.value)){state.active=Number(el.dataset.value);render('schedule')}break;
     case 'recommend':await recommend();break;
     case 'recommend-ai':await recommend('ai');break;
+    case 'view-empty-option':{
+      const candidate=state.emptyGuidance?.options[Number(el.dataset.value)]?.candidate;
+      if(state.route!=='empty'||!candidate)break;
+      const request=candidate.requestSnapshot,career=careerList(request);
+      state.options=[career?{...candidate,careerAssessment:structuredClone(career)}:candidate];
+      state.resultRequest=structuredClone(request);
+      state.active=0;
+      go('results');break;
+    }
     case 'relax-options':dialog(relaxationDialog(state.request));break;
     case 'alternative':{
       const c=state.route==='saved'?store.data.semester?.candidate:current();
@@ -557,7 +692,7 @@ async function act(action,el){
     case 'career-required':{
       const groups=groupCareerCourses(careerList(),state.courses.filter(c=>c.availableSectionCount!==0),{selectable:true});
       if(![...groups.major,...groups.general].some(c=>c.id===el.dataset.id&&c.availableSectionCount!==0))break;
-      state.request=toggleRequiredCourse(state.request,el.dataset.id);render();break;
+      toggleCourseSelection(el.dataset.id);break;
     }
     case 'career-evaluate':{
       if(state.careerBusy||state.catalogBusy)break;
@@ -602,8 +737,17 @@ $('event-dialog').addEventListener('cancel',event=>{event.preventDefault();close
 document.addEventListener('input',e=>{
   const el=e.target,r=state.request;if(!r)return;
   if(el.id==='course-search'){state.query=el.value;$('course-list').innerHTML=courseList()}
-  if(el.id==='target-credits'){const n=Number(el.value);r.credits.total={min:n,max:n};r.credits.major.max=Math.max(r.credits.major.min,n);r.credits.general.max=Math.max(r.credits.general.min,n)}
-  if(el.dataset.credit)r.credits[el.dataset.credit][el.dataset.bound]=Number(el.value);
+  if(el.id==='target-credits'){
+    const value=el.valueAsNumber;
+    if(state.creditChoice.mode==='ranges')r.credits.total={min:value,max:value};
+    else state.creditChoice={mode:'goal',value};
+    syncCreditPlan(false);updateCreditFeedback();
+  }
+  if(el.dataset.credit){
+    state.creditChoice={mode:'ranges'};
+    r.credits[el.dataset.credit][el.dataset.bound]=el.valueAsNumber;
+    syncCreditPlan();updateCreditFeedback();
+  }
   if(el.id==='note-title')state.noteTitle=el.value;
   if(el.id==='career-goal')state.careerGoal=el.value;
   if(el.id==='note-body')state.noteBody=el.value;
@@ -615,10 +759,27 @@ document.addEventListener('change',e=>{
   if(el.id==='catalog-term'||el.id==='catalog-department'){changeCatalog({term:$('catalog-term').value,department:$('catalog-department').value});return}
   updateHardCondition(r,el);
   if(el.dataset.pref)r.preferences[el.dataset.pref]=el.checked;
-  if(el.dataset.day!==undefined){const d=Number(el.dataset.day);r.allowedDays=el.checked?[...r.allowedDays,d].sort():r.allowedDays.filter(x=>x!==d);el.nextElementSibling.textContent=(el.checked?'✓ ':'')+dayNames[d]}
-  if(['earliestStart','latestEnd'].includes(el.id))r[el.id]=Number(el.value);
+  if(el.id==='target-credits'){
+    syncCreditPlan();
+    if(state.creditChoice.mode==='goal')el.value=creditValue(state.creditChoice.value);
+    updateCreditFeedback();
+  }
+  if(el.dataset.day!==undefined){
+    const d=Number(el.dataset.day);
+    r.allowedDays=el.checked?[...r.allowedDays,d].sort():r.allowedDays.filter(x=>x!==d);
+    el.nextElementSibling.textContent=(el.checked?'✓ ':'')+dayNames[d];
+    renderSelectedCourseTimes();
+  }
+  if(['earliestStart','latestEnd'].includes(el.id)){
+    r[el.id]=Number(el.value);renderSelectedCourseTimes();
+  }
   if(el.id==='daily-limit')r.maxCoursesPerDay=el.value?Number(el.value):null;
-  if(el.dataset.exclude){const id=el.dataset.exclude;r.excludedCourseIds=el.checked?[...new Set([...r.excludedCourseIds,id])]:r.excludedCourseIds.filter(x=>x!==id);if(el.checked)r.requiredCourseIds=r.requiredCourseIds.filter(x=>x!==id);render()}
+  if(el.dataset.exclude){
+    const id=el.dataset.exclude;
+    r.excludedCourseIds=el.checked?[...new Set([...r.excludedCourseIds,id])]:r.excludedCourseIds.filter(x=>x!==id);
+    if(el.checked)r.requiredCourseIds=r.requiredCourseIds.filter(x=>x!==id);
+    syncCreditPlan();render();
+  }
   if(el.id==='calendar-date'&&el.value)setCalendarDate(el.value);
   if(el.id==='show-calendar-classes'){state.showCalendarClasses=el.checked;calendarWidget?.refetchEvents()}
   if(el.form?.id==='event-form')readEventDraft(el.form);
@@ -679,7 +840,8 @@ async function init(){
     let meta=await api('meta');
     if(meta.catalogInfo.terms?.includes(scope?.term)&&meta.catalogInfo.departments?.includes(scope?.department))meta=await api('meta?'+new URLSearchParams(scope));
     state.courses=meta.courses;state.catalogInfo=meta.catalogInfo;state.request=structuredClone(meta.defaultRequest);
-    Object.assign(state.request,{requiredCourseIds:[],allowedDays:[0,1,2,3],earliestStart:600,credits:{total:{min:13,max:13},major:{min:9,max:9},general:{min:4,max:4}}});
+    Object.assign(state.request,{requiredCourseIds:[],allowedDays:[0,1,2,3],earliestStart:600,credits:structuredClone(defaultCreditRanges)});
+    syncCreditPlan();
     routeChanged();if(store.readError)flash(store.readError,true);
     if(!lmsReady){lmsReady=true;setupLms({
       setLmsCalendar(value){

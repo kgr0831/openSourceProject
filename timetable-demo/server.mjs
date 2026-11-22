@@ -5,6 +5,9 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {CodexBridge,openBrowser} from './codex.mjs';
 import * as liveScheduler from './schedule.mjs';
+import {checkCourseCompatibility} from './course-compatibility.mjs';
+import {addEmptyGuidance} from './empty-guidance.mjs';
+import {courseFacets} from './public/course-filters.mjs';
 import {ortoolsProvider} from './ortools-provider.mjs';
 import {friendlyError} from '../lms-parser/errors.mjs';
 
@@ -24,11 +27,16 @@ files['/ui.js']=['ui.js','text/javascript; charset=utf-8'];
 files['/design-assets.js']=['design-assets.js','text/javascript; charset=utf-8'];
 files['/career-model.mjs']=['career-model.mjs','text/javascript; charset=utf-8'];
 files['/solver-ui.js']=['solver-ui.js','text/javascript; charset=utf-8'];
+for(const module of ['timetable-warning-ui.js','travel-warnings.mjs','campus-walking-routes.mjs',
+  'course-credits.mjs','course-filters.mjs','course-times.mjs','course-flow-ui.js','relaxation-options.mjs']){
+  files['/'+module]=[module,'text/javascript; charset=utf-8'];
+}
 files['/calendar-logic.mjs']=['calendar-logic.mjs','text/javascript; charset=utf-8'];
 files['/calendar-display.mjs']=['calendar-display.mjs','text/javascript; charset=utf-8'];
 files['/calendar-view.js']=['calendar-view.js','text/javascript; charset=utf-8'];
 files['/calendar.css']=['calendar.css','text/css; charset=utf-8'];
 files['/lms.css']=['lms.css','text/css; charset=utf-8'];
+files['/walking-route-times.mjs']=['walking-route-times.mjs','text/javascript; charset=utf-8'];
 const calendarAssets=new Map([
   ['calendar.js','all/global.js'], ['theme.js','themes/monarch/global.js'], ['ko.js','locales/ko/global.js'],
   ['skeleton.css','skeleton.css'], ['theme.css','themes/monarch/theme.css'], ['palette.css','themes/monarch/palettes/blue.css']
@@ -36,6 +44,10 @@ const calendarAssets=new Map([
 export function createTimetableServer({port=4317,bridge=new CodexBridge(),scheduler=liveScheduler,createLms=async()=>new (await import('./lms-service.mjs')).LmsCalendarService()}={}) {
 const {defaultRequest,getCourses,catalogInfo,generateCandidates,validateRequest,validateAiResult,outputSchema,applyIntent,intentSchema}=scheduler;
 let recommendationBusy=false,lmsPromise=null,lms=null;
+async function recommendWithGuidance(request,options){
+  const result=await generateCandidates(request,options);
+  return addEmptyGuidance(result,{...options,getCourses,generateCandidates});
+}
 async function getLms(){
   if(!lmsPromise)lmsPromise=Promise.resolve().then(createLms).then(app=>{lms=app;app.resume();return app}).catch(()=>{lmsPromise=null;throw new Error('LMS 구성 요소를 준비하지 못했어요. 시간표 데모 시작 파일을 다시 실행해 주세요.')});
   return lmsPromise;
@@ -67,8 +79,9 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==='GET' && url.pathname==='/api/meta'){
       const scope={term:url.searchParams.get('term')??defaultRequest.term,department:url.searchParams.get('department')??defaultRequest.department};
       const selected=getCourses(scope);
-      return reply(res,200,{courses:selected.map(({sections,...course})=>({...course,offerings:sections.map(s=>({courseNumber:s.courseNumber,offeredBy:s.offeredBy,available:!s.unavailableReason})),
-        sectionCount:sections.length,availableSectionCount:sections.filter(section=>section.meetings.length).length})),
+      return reply(res,200,{courses:selected.map(({sections,...course})=>({...course,
+        offerings:sections.map(s=>({courseNumber:s.courseNumber,offeredBy:s.offeredBy,available:!s.unavailableReason})),
+        facets:courseFacets(sections),sectionCount:sections.length,availableSectionCount:sections.filter(section=>section.meetings.length).length})),
         defaultRequest:{...defaultRequest,...scope},catalogInfo:{...catalogInfo,...scope,careerDataVersion:scheduler.careerDataVersion,
           majorCount:selected.filter(course=>course.kind==='major').length,generalCount:selected.filter(course=>course.kind==='general').length,
           selectedCourseCount:selected.length,selectedSectionCount:selected.reduce((count,course)=>count+course.sections.length,0),
@@ -79,6 +92,12 @@ const server=http.createServer(async(req,res)=>{
     if(req.method!=='POST')return reply(res,404,{error:'페이지를 찾을 수 없습니다.'});
     if(req.headers['x-timetable-app']!=='1')return reply(res,403,{error:'앱 화면에서 다시 시도해 주세요.'});
     const body=await readJson(req);
+    if(url.pathname==='/api/course-compatibility'){
+      if(body?.catalogVersion!==undefined&&body.catalogVersion!==defaultRequest.catalogVersion){
+        throw new Error('과목 자료를 다시 불러와 주세요.');
+      }
+      return reply(res,200,checkCourseCompatibility(getCourses,body));
+    }
     if(url.pathname.startsWith('/api/lms/')){
       const actions={'/api/lms/connect':app=>app.connect(),'/api/lms/confirm-login':app=>app.confirmLogin(),
         '/api/lms/focus-login':app=>app.focusLogin(),'/api/lms/disconnect':app=>app.disconnect({forget:true}),
@@ -98,7 +117,7 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==='/api/cancel')return reply(res,200,await bridge.cancelLogin());
     if(['/api/candidates','/api/relax','/api/alternatives'].includes(url.pathname)){
       const mode=url.pathname==='/api/relax'?'relax':url.pathname==='/api/alternatives'?'alternative':'recommend';
-      return reply(res,200,await generateCandidates(mode==='alternative'?body.request:body,{mode,baseline:mode==='alternative'?body.baseline:undefined,signal:controller.signal}));
+      return reply(res,200,await recommendWithGuidance(mode==='alternative'?body.request:body,{mode,baseline:mode==='alternative'?body.baseline:undefined,signal:controller.signal}));
     }
     if(url.pathname==='/api/recommend') {
       if(recommendationBusy)throw new Error('이미 추천을 생성하고 있습니다. 잠시 기다려 주세요.');
@@ -109,7 +128,7 @@ const server=http.createServer(async(req,res)=>{
           const intent=await bridge.recommend({task:'요청을 수업 요일·시간·학점·과목 조건으로 해석해 주세요. 명시되지 않은 값은 null. 해석 불가능한 요청은 unsupported에 표시.',currentSettings:request,note:request.note,catalog:getCourses(request).map(({sections,...course})=>course)},intentSchema,{mode:'interpret'});
           ({request,interpretation}=applyIntent(request,intent.data));
         }
-        const result=await generateCandidates(request,{signal:controller.signal}),candidates=result.candidates;
+        const result=await recommendWithGuidance(request,{signal:controller.signal}),candidates=result.candidates;
         if(!result.total)return reply(res,200,{...result,interpretation,summary:'조건에 맞는 시간표를 찾지 못했어요.',recommendations:[],source:interpretation?'codex':'rules'});
         const ai=await bridge.recommend({task:`서로 다른 후보 ${Math.min(3,candidates.length)}개 추천. summary 1문장, reason은 전공·교양 선택 이유와 시간상 장단점 2~3문장. 수업 난이도·성적·과제량은 판단하지 마세요.`,request,defaultIds:result.defaultIds,note:request.note,metricDefinitions:{morningClasses:'12시 이전 시작 수업 횟수',fridayClasses:'금요일 수업 횟수',gapMinutes:'일별 수업 사이 빈 시간의 주간 합(분)',buildingChanges:'일별 건물 변경 횟수의 주간 합'},candidates:candidates.map(({sections,...c})=>({...c,courses:sections.map(s=>({courseId:s.courseId,name:s.name,kind:s.kind,credits:s.credits,topic:s.topic}))}))},outputSchema);
         return reply(res,200,{...result,interpretation,...validateAiResult(ai.data,candidates),source:'codex',model:ai.model});
