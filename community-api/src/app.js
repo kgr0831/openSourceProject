@@ -1,11 +1,13 @@
-const authRoutes = require("./modules/auth/auth.routes");
+
 const express = require("express");
 const cors = require("cors");
 
 const app = express();
-const sessionMiddleware = require("./config/session");
 
-// 미들웨어 설정
+const sessionMiddleware = require("./config/session");
+const authRoutes = require("./modules/auth/auth.routes");
+const postRoutes = require("./modules/posts/post.routes");
+
 app.use(cors({
   origin: true,
   credentials: true,
@@ -13,7 +15,10 @@ app.use(cors({
 
 app.use(express.json());
 app.use(sessionMiddleware);
+
 app.use("/auth", authRoutes);
+app.use("/posts", postRoutes);
+
 // 서버 상태 확인 API
 app.get("/health", (req, res) => {
   res.json({
