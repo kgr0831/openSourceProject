@@ -2055,3 +2055,81 @@ dialog[open]::backdrop { animation:backdrop-enter .2s ease-out; }
 .catalog-selectors .field{min-width:0;margin:0}.catalog-selectors select{width:100%;min-width:0}
 .catalog-count{font-size:14px;margin:10px 0 4px}.catalog-controls small{display:block;line-height:1.6}
 .course-card:disabled{opacity:.6;cursor:default}
+
+/* --- Auth (Login & Signup) UI Styles --- */
+.auth-switch-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted, #64748b);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line, #e2e8f0);
+}
+.auth-switch-link a {
+  color: var(--brand, #3e5fad);
+  font-weight: 600;
+  text-decoration: none;
+}
+.auth-switch-link a:hover {
+  text-decoration: underline;
+}
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #f1f5f9;
+  border: 1px solid var(--line, #e2e8f0);
+  color: #1e293b;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.user-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px #d1fae5;
+}
+.sidebar-user {
+  margin: 16px 16px 8px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.sidebar-user-name {
+  font-weight: 600;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-user-links {
+  margin: 16px 16px 8px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px dashed var(--line, #e2e8f0);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted, #64748b);
+}
+.side-auth-link {
+  color: var(--brand, #3e5fad);
+  text-decoration: none;
+  font-weight: 600;
+}
+.side-auth-link:hover {
+  text-decoration: underline;
+}
