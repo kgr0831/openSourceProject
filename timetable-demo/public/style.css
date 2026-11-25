@@ -1014,7 +1014,7 @@ textarea {
 
 .bottom-nav {
   display:grid;
-  grid-template-columns:repeat(3,1fr);
+  grid-template-columns:repeat(4,1fr);
   height:80px;
   min-height:80px;
   position:sticky;
@@ -2191,3 +2191,32 @@ dialog[open]::backdrop { animation:backdrop-enter .2s ease-out; }
   border-radius:12px;
 }
 .empty-option-list ul { margin:0; }
+.program-search { margin-bottom:24px; }
+.program-search textarea { min-height:96px; resize:vertical; }
+.program-option { display:flex; align-items:center; gap:10px; margin:16px 0; font-size:14px; }
+.program-option input { width:18px; height:18px; accent-color:var(--brand); }
+.program-search-actions,.program-card-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+.program-search-actions .button { flex:1 1 190px; }
+.program-status { line-height:1.7; padding:12px 0; font-size:14px; }
+.program-help,.program-department { color:var(--muted); font-size:13px; line-height:1.7; }
+.program-results { margin-top:24px; }
+.program-result-heading { margin-bottom:20px; }
+.program-result-heading h2 { margin-bottom:8px; }
+.program-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+.program-card { min-width:0; margin:0; display:flex; flex-direction:column; gap:10px; }
+.program-card h2 { font-size:18px; line-height:1.6; margin:0; overflow-wrap:anywhere; }
+.program-card p { margin:0; line-height:1.7; overflow-wrap:anywhere; }
+.program-card small { color:var(--muted); line-height:1.6; }
+.program-badges { display:flex; flex-wrap:wrap; gap:8px; }
+.program-reason { font-size:14px; }
+.program-facts { display:grid; grid-template-columns:70px minmax(0,1fr); gap:8px; font-size:13px; line-height:1.7; }
+.program-facts dt { color:var(--muted); }
+.program-facts dd { margin:0; overflow-wrap:anywhere; }
+.program-card details { padding:12px 0; border-top:1px solid var(--line); font-size:13px; }
+.program-card details p { margin-top:10px; white-space:pre-line; }
+.program-card-actions { margin-top:auto; padding-top:12px; }
+.program-card-actions .button { flex:1 1 140px; font-size:13px; }
+@media(max-width:650px) {
+  .program-grid { grid-template-columns:minmax(0,1fr); gap:16px; }
+  .program-card h2 { font-size:16px; }
+}

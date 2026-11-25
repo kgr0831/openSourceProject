@@ -1,4 +1,6 @@
 import {evaluateCareer} from './career.mjs';
+import {createProgramSource,prepareProgramData} from './program-data.mjs';
+import {evaluatePrograms} from './programs.mjs';
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -26,6 +28,8 @@ const files={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','
 files['/ui.js']=['ui.js','text/javascript; charset=utf-8'];
 files['/design-assets.js']=['design-assets.js','text/javascript; charset=utf-8'];
 files['/career-model.mjs']=['career-model.mjs','text/javascript; charset=utf-8'];
+files['/program-model.mjs']=['program-model.mjs','text/javascript; charset=utf-8'];
+files['/program-ui.js']=['program-ui.js','text/javascript; charset=utf-8'];
 files['/solver-ui.js']=['solver-ui.js','text/javascript; charset=utf-8'];
 for(const module of ['timetable-warning-ui.js','travel-warnings.mjs','campus-walking-routes.mjs',
   'course-credits.mjs','course-filters.mjs','course-times.mjs','course-flow-ui.js','relaxation-options.mjs']){
@@ -41,7 +45,7 @@ const calendarAssets=new Map([
   ['calendar.js','all/global.js'], ['theme.js','themes/monarch/global.js'], ['ko.js','locales/ko/global.js'],
   ['skeleton.css','skeleton.css'], ['theme.css','themes/monarch/theme.css'], ['palette.css','themes/monarch/palettes/blue.css']
 ]);
-export function createTimetableServer({port=4317,bridge=new CodexBridge(),scheduler=liveScheduler,createLms=async()=>new (await import('./lms-service.mjs')).LmsCalendarService()}={}) {
+export function createTimetableServer({port=4317,bridge=new CodexBridge(),scheduler=liveScheduler,programSource=createProgramSource(),programNow=()=>new Date(),createLms=async()=>new (await import('./lms-service.mjs')).LmsCalendarService()}={}) {
 const {defaultRequest,getCourses,catalogInfo,generateCandidates,validateRequest,validateAiResult,outputSchema,applyIntent,intentSchema}=scheduler;
 let recommendationBusy=false,lmsPromise=null,lms=null;
 async function recommendWithGuidance(request,options){
@@ -76,6 +80,7 @@ const server=http.createServer(async(req,res)=>{
       catch(error){if(error.code==='ENOENT')return reply(res,404,{error:'파일을 찾을 수 없습니다.'});throw error}
     }
     if(req.method==='GET' && url.pathname==='/api/health')return reply(res,200,{app:'timetable-demo',version:'0.1.0',pid:process.pid});
+    if(req.method==='GET' && url.pathname==='/api/programs/meta')return reply(res,200,prepareProgramData(await programSource.load(),programNow()).meta);
     if(req.method==='GET' && url.pathname==='/api/meta'){
       const scope={term:url.searchParams.get('term')??defaultRequest.term,department:url.searchParams.get('department')??defaultRequest.department};
       const selected=getCourses(scope);
@@ -112,6 +117,11 @@ const server=http.createServer(async(req,res)=>{
       if(recommendationBusy||bridge.busy)throw new Error('추천을 생성 중입니다. 잠시 기다려 주세요.');
       recommendationBusy=true;
       try{return reply(res,200,await evaluateCareer(body,bridge,scheduler,{signal:controller.signal}))}finally{recommendationBusy=false}
+    }
+    if(url.pathname==='/api/programs/recommend'){
+      if(recommendationBusy||bridge.busy)throw new Error('추천을 생성 중입니다. 잠시 기다려 주세요.');
+      recommendationBusy=true;
+      try{return reply(res,200,await evaluatePrograms(body,bridge,programSource,{signal:controller.signal,now:programNow}))}finally{recommendationBusy=false}
     }
     if(url.pathname==='/api/connect')return reply(res,200,await bridge.connect());
     if(url.pathname==='/api/cancel')return reply(res,200,await bridge.cancelLogin());

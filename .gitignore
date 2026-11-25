@@ -17,5 +17,6 @@ storage-state*.json
 login.dpapi
 login-*.tmp
 .venv/
+extracurricular-collector/output/
 __pycache__/
 *.pyc
