@@ -402,7 +402,7 @@ async function assertSheetActions(page, viewportHeight) {
 }
 
 async function navigatePlanner(page, route, tap = false) {
-  const link = page.locator((tap ? '.bottom-nav' : '.sidebar') + ' a[href="#' + route + '"]');
+  const link = page.locator((tap ? '.bottom-nav' : '.topnav') + ' a[href="#' + route + '"]');
   await (tap ? link.tap() : link.click());
   await page.locator('.planner-screen[data-route="' + route + '"]').waitFor();
 }

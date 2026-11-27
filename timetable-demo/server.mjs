@@ -15,7 +15,7 @@ import {friendlyError} from '../lms-parser/errors.mjs';
 
 const root=path.dirname(fileURLToPath(import.meta.url));
 function reply(res,status,data,type='application/json; charset=utf-8'){
-  res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' http://localhost:4000 http://127.0.0.1:4000; object-src 'none'; base-uri 'none'; frame-ancestors 'self'"});
+  res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'"});
   res.end(type.startsWith('application/json')?JSON.stringify(data):data);
 }
 async function readJson(req){
@@ -26,7 +26,6 @@ async function readJson(req){
 }
 const files={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/planner.js':['planner.js','text/javascript; charset=utf-8'],'/planner-core.mjs':['planner-core.mjs','text/javascript; charset=utf-8'],'/lms.js':['lms.js','text/javascript; charset=utf-8'],'/lms-calendar.mjs':['lms-calendar.mjs','text/javascript; charset=utf-8']};
 files['/ui.js']=['ui.js','text/javascript; charset=utf-8'];
-files['/design-assets.js']=['design-assets.js','text/javascript; charset=utf-8'];
 files['/career-model.mjs']=['career-model.mjs','text/javascript; charset=utf-8'];
 files['/program-model.mjs']=['program-model.mjs','text/javascript; charset=utf-8'];
 files['/program-ui.js']=['program-ui.js','text/javascript; charset=utf-8'];
@@ -67,6 +66,14 @@ const server=http.createServer(async(req,res)=>{
   const controller=new AbortController();
   res.once('close',()=>{if(!res.writableEnded)controller.abort()});
   try {
+    // Account requests stay on this origin: nginx serves /auth on the hosted site, this forwards it locally.
+    // ponytail: plain pass-through to one local API; add timeouts and header filtering if it ever leaves loopback.
+    if(url.pathname.startsWith('/auth/')){
+      const upstream=http.request({host:'127.0.0.1',port:Number(process.env.COMMUNITY_API_PORT||4000),path:url.pathname+url.search,method:req.method,headers:{...req.headers,host:'127.0.0.1'}},
+        api=>{res.writeHead(api.statusCode,api.headers);api.pipe(res)});
+      upstream.on('error',()=>{if(!res.headersSent)reply(res,502,{error:'로그인 서버에 연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.'})});
+      return req.pipe(upstream);
+    }
     if(req.method==='GET' && files[url.pathname]){const [file,type]=files[url.pathname];return reply(res,200,await readFile(path.join(root,'public',file)),type)}
     if(req.method==='GET' && url.pathname.startsWith('/vendor/fullcalendar/')){
       const file=calendarAssets.get(url.pathname.slice('/vendor/fullcalendar/'.length));
@@ -75,7 +82,7 @@ const server=http.createServer(async(req,res)=>{
       try{return reply(res,200,await readFile(path.join(root,'node_modules','fullcalendar',file)),type)}
       catch(error){if(error.code==='ENOENT')return reply(res,404,{error:'캘린더 구성 요소를 먼저 설치해 주세요.'});throw error}
     }
-    if(req.method==='GET' && /^\/assets\/(?:figma\/[A-Za-z0-9-]+\.svg|noto-sans-kr-(?:400|500|700)\.woff2|OFL-NotoSansKR\.txt)$/.test(url.pathname)){
+    if(req.method==='GET' && /^\/assets\/(?:favicon\.svg|ibm-plex-sans-kr-(?:400|500|600|700)\.woff2|OFL-IBMPlexSansKR\.txt)$/.test(url.pathname)){
       const type=url.pathname.endsWith('.svg')?'image/svg+xml':url.pathname.endsWith('.woff2')?'font/woff2':'text/plain; charset=utf-8';
       try{return reply(res,200,await readFile(path.join(root,'public',url.pathname.slice(1))),type)}
       catch(error){if(error.code==='ENOENT')return reply(res,404,{error:'파일을 찾을 수 없습니다.'});throw error}

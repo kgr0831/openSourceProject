@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AUTH_BASE_URL, login, signup, getMe, logout, getCachedUser, saveUser, clearUser } from '../public/auth.js';
 
-test('AUTH_BASE_URL is set to backend port 4000', () => {
-  assert.equal(AUTH_BASE_URL, 'http://localhost:4000');
+test('AUTH_BASE_URL keeps account requests on the same origin', () => {
+  assert.equal(AUTH_BASE_URL, '');
 });
 
 test('login requires studentId and password', async () => {

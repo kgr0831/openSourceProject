@@ -1,8 +1,26 @@
-import {assets} from './design-assets.js';
 import {sectionLocation, timeText} from './planner-core.mjs';
 
 export const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export const icon=(screen,name)=>`<img class="icon" src="${assets[screen][name]}" alt="" aria-hidden="true">`;
+// One stroke icon set, drawn on a 24px grid and coloured by the surrounding text.
+const iconPaths={
+  back:'<path d="M15 18l-6-6 6-6"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  close:'<path d="M6 6l12 12M18 6 6 18"/>',
+  chevron:'<path d="m9 6 6 6-6 6"/>',
+  home:'<path d="M4 10.5 12 4l8 6.5V20H15v-6H9v6H4z"/>',
+  build:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 10v10"/>',
+  career:'<circle cx="12" cy="12" r="8"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
+  calendar:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  clock:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+  download:'<path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 20h14"/>',
+  alert:'<path d="M12 4 3 20h18z"/><path d="M12 10v4M12 17v.5"/>',
+  search:'<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>',
+  spark:'<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
+  book:'<path d="M5 4.5h9a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h9"/>'
+};
+export const icon=name=>`<svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${iconPaths[name]}</svg>`;
 export const button=(label,action,variant='primary',attrs='')=>`<button type="button" class="button ${variant}" data-action="${action}" ${attrs}>${label}</button>`;
 export const link=(label,route,variant='quiet',attrs='')=>`<a class="button ${variant}" href="#${route}" ${attrs}>${label}</a>`;
 export const heading=(title,description='')=>`<div class="heading"><h1 tabindex="-1">${title}</h1>${description?`<p>${description}</p>`:''}</div>`;
@@ -13,7 +31,7 @@ export const tabs=(items,active,action)=>`<div class="tabs" role="group" data-ta
 export const footer=(content,hint='')=>`<footer class="action-footer">${hint?`<p>${hint}</p>`:''}${content}</footer>`;
 export const dayNames=['월','화','수','목','금','토','일'];
 const colors=['sage','lavender','blue','peach','sand'];
-const courseColor=id=>({ds:'sage',algo:'lavender',db:'blue',media:'sand',bible:'peach'})[id]||colors[Array.from(id).reduce((sum,c)=>sum+c.charCodeAt(0),0)%colors.length];
+export const courseColor=id=>({ds:'sage',algo:'lavender',db:'blue',media:'sand',bible:'peach'})[id]||colors[Array.from(id).reduce((sum,c)=>sum+c.charCodeAt(0),0)%colors.length];
 export function timetable(candidate,action='section',{fullDetails=false}={}){
   if(!candidate?.sections?.length)return '';
   const meetings=candidate.sections.flatMap(s=>s.meetings);
