@@ -544,7 +544,7 @@ button.flow-step{color:var(--ink-2);cursor:pointer}
 .ai-connection{display:grid;gap:10px;justify-items:start}
 
 .auth-body{align-items:center}
-.auth-body > .auth-card{inline-size:min(100%,440px);margin-block:auto}
+.auth-body > .auth-card{inline-size:min(100%,440px);margin-block:clamp(24px,11vh,112px) auto}
 .auth-brand{display:flex;align-items:center;gap:10px;font-size:1.0625rem;font-weight:700;letter-spacing:-.02em}
 .auth-card{display:grid;gap:22px;inline-size:min(100%,440px);margin-inline:auto}
 

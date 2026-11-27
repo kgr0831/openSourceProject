@@ -17,6 +17,10 @@ export function publicError(error) {
 export function friendlyError(error) {
   const messages = {
     BROWSER: 'Chrome 또는 Microsoft Edge를 설치한 뒤 다시 연결해 주세요.',
+    CREDENTIALS: '학번 또는 비밀번호가 맞지 않아요. 숭실대 LMS에서 쓰는 것과 같은지 확인해 주세요.',
+    CREDENTIALS_INPUT: '학번과 비밀번호를 입력해 주세요.',
+    LOGIN_INCOMPLETE: '학교 로그인을 끝내지 못했어요. 잠시 후 다시 시도해 주세요.',
+    WINDOW_LOGIN: '학번과 비밀번호로 로그인해 주세요.',
     BROWSER_CLOSED: '학교 연결이 끊겼어요. 다시 연결해 주세요.',
     AUTH_REQUIRED: '학교 로그인이 만료되었어요. 다시 연결해 주세요.',
     SESSION_STORAGE: '이 PC에 로그인 상태를 보관하지 못했어요. 다음 실행 때 다시 연결해 주세요.',

@@ -3,7 +3,7 @@ import {mergeLmsCalendar,restoreLmsCalendar} from './lms-calendar.mjs';
 const $=id=>document.getElementById(id);
 const node=(tag,text='',className='')=>{const element=document.createElement(tag);element.textContent=text;element.className=className;return element};
 const storageKey=account=>'ssu-timetable-lms-v1:'+account;
-const busyConnections=new Set(['restoring','opening','waiting','checking','loading','background','disconnecting']);
+const busyConnections=new Set(['restoring','opening','waiting','checking','signing','loading','background','disconnecting']);
 
 export function setupLms(planner){
   let state=null,account=null,cache=null,selected=new Set(),acting=false,issued=0,applied=0,timer=null;
@@ -95,24 +95,29 @@ export function setupLms(planner){
     $('lms-no-courses').hidden=visible.length>0;
     $('lms-selection-count').textContent=`${selected.size}개 선택`;
     $('lms-sync').disabled=locked()||!account||!selected.size;
-    $('lms-sync').textContent=cache?'일정 새로고침':'일정 가져오기';$('lms-sync').className='button '+(cache?'secondary':'primary');
+    $('lms-sync').textContent=!selected.size?'과목을 선택하세요':cache?'일정 새로고침':'일정 가져오기';$('lms-sync').className='button '+(cache?'secondary':'primary');
     for(const id of ['lms-search','lms-term','lms-select-visible','lms-clear'])$(id).disabled=locked();
   }
 
   function render(){
     const connection=state?.connection||'disconnected',pending=busyConnections.has(connection),connected=connection==='connected';
-    const titles={restoring:'저장된 학교 로그인 확인 중',opening:'학교 로그인 창을 열고 있어요',waiting:'학교 창에서 로그인을 완료해 주세요',checking:'로그인 확인 중',loading:'내 수강 과목을 확인하고 있어요',background:'학교 연결을 백그라운드로 전환 중',disconnecting:'학교 연결을 해제하고 있어요',connected:state?.accountName||'LMS 계정',disconnected:'숭실대 LMS로 시작하기',error:'다시 로그인해 주세요'};
+    const titles={restoring:'저장된 학교 로그인 확인 중',opening:'학교 로그인 창을 열고 있어요',waiting:'학교 창에서 로그인을 완료해 주세요',checking:'로그인 확인 중',signing:'숭실대 LMS에 로그인하고 있어요',loading:'내 수강 과목을 확인하고 있어요',background:'학교 연결을 백그라운드로 전환 중',disconnecting:'학교 연결을 해제하고 있어요',connected:state?.accountName||'LMS 계정',disconnected:'숭실대 계정으로 로그인',error:'숭실대 계정으로 로그인'};
     $('lms-connection-title').textContent=state?.job?.reconnect?'학교 계정을 다시 연결해 주세요':titles[connection];
-    $('lms-connection-description').textContent=connected?(state.remembered?'이 기기에서 로그인이 유지돼요.':'앱을 다시 열면 로그인이 필요할 수 있어요.'):pending?'로그인이 끝나면 학교 창은 자동으로 닫혀요.':'처음이면 자동으로 가입돼요.';
-    $('lms-badge').textContent=running()?'가져오는 중':pending?'연결 중':account?'연결됨':'';
+    $('lms-connection-description').textContent=connected?(state.remembered?'이 기기에서 로그인이 유지돼요.':'앱을 다시 열면 로그인이 필요할 수 있어요.'):connection==='signing'?'':pending?'로그인이 끝나면 학교 창은 자동으로 닫혀요.':'처음이면 자동으로 가입돼요.';
+    $('lms-badge').textContent=running()?'가져오는 중':connection==='signing'?'로그인 중':pending?'연결 중':account?'연결됨':'';
     $('lms-badge').className='badge'+(account?'':' neutral')+(pending||running()?' busy':'');$('lms-badge').hidden=!$('lms-badge').textContent;
     $('lms-panel').classList.toggle('signed-in',Boolean(account));
-    $('lms-connect').hidden=pending||connected&&!state?.job?.reconnect;
+    const signedOut=!pending&&(!connected||Boolean(state?.job?.reconnect)),hosted=state?.windowLogin===false;
+    $('lms-signin').hidden=!signedOut;
+    for(const id of ['lms-user-id','lms-password','lms-signin-submit'])$(id).disabled=acting||running();
+    $('lms-privacy').textContent='학교 공식 서비스가 아니에요. '+(hosted?'비밀번호는 이 서버가 숭실대 LMS에 로그인하는 데만 쓰고 저장하지 않아요.':'비밀번호는 숭실대 LMS 로그인에만 쓰고 저장하지 않아요.')+' 수강 과목과 일정만 읽어요.';
+    $('lms-password').toggleAttribute('aria-invalid',connection==='error'&&signedOut);
+    $('lms-connect').hidden=!signedOut||hosted;
     $('lms-connect').disabled=acting||running()||pending;
-    $('lms-connect-label').textContent=state?.job?.reconnect?'다시 로그인':'LMS로 로그인';
+
     $('lms-disconnect').hidden=!connected&&!pending;
     $('lms-disconnect').disabled=acting||running()||connection==='disconnecting';
-    $('lms-disconnect').textContent=pending?'취소':'로그아웃';$('lms-disconnect').className='button '+(pending?'quiet':'secondary');
+    $('lms-disconnect').textContent=pending?'취소':'로그아웃';$('lms-disconnect').className='button '+(pending&&connection!=='signing'?'quiet':'secondary');
     $('lms-login-help').hidden=!['waiting','checking'].includes(connection);
     $('lms-confirm').disabled=acting||connection!=='waiting';$('lms-focus').disabled=acting;
     const message=localNotice||state?.notice||'';
@@ -137,6 +142,14 @@ export function setupLms(planner){
   }
 
   $('lms-connect').addEventListener('click',()=>act('connect'));
+  // The password leaves this page once, in the sign-in request, and the field is emptied straight away.
+  $('lms-signin').addEventListener('submit',event=>{
+    event.preventDefault();
+    const userId=$('lms-user-id').value.trim(),password=$('lms-password').value;
+    $('lms-password').value='';
+    if(!userId||!password){localNotice='학번과 비밀번호를 입력해 주세요.';render();return}
+    act('sign-in',{userId,password});
+  });
   $('lms-disconnect').addEventListener('click',()=>act('disconnect'));
   $('lms-focus').addEventListener('click',()=>act('focus-login'));
   $('lms-confirm').addEventListener('click',()=>act('confirm-login'));

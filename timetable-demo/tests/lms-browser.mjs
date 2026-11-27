@@ -12,10 +12,11 @@ const {chromium}=createRequire(new URL('../../lms-parser/package.json',import.me
 
 test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로그아웃을 실제 브라우저에서 확인한다',{timeout:90000},async t=>{
   const fixture=fixtureFetch(),failures=[];
-  let currentUser=99,loggedIn=false,dueAt='2026-11-10T14:59:00Z',gated=false,release=null;
+  let currentUser=99,loggedIn=false,dueAt='2026-11-10T14:59:00Z',gated=false,release=null;const signIns=[];
   const app=new LmsCalendarService({loginInterval:10,createSession:async()=>({
     restore:async()=>null,openLogin:async()=>{},checkLogin:async()=>loggedIn?{id:currentUser}:null,
     completeLogin:async()=>{loggedIn=true},useInBackground:async()=>{},save:async()=>{},close:async()=>{},remembered:true,
+    passwordLogin:async({userId,password})=>{signIns.push(userId);if(password!=='right-pass')throw Object.assign(new Error('refused'),{code:'CREDENTIALS'});currentUser=101;loggedIn=true},
   }),createClient:(_,signal)=>new HttpClient({signal,fetchImpl:async(url,options)=>{
     const parsed=new URL(url);
     if(parsed.pathname==='/api/v1/users/self')return Response.json({id:currentUser,name:'김숭실'});
@@ -40,7 +41,7 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
   await page.goto(base+'/#signup');await page.locator('main[data-route="start"]').waitFor();
   assert.equal(await page.locator('.sidebar .avatar').count(),0);
   await page.locator('.shortcut-list a[href="#login"]').click();
-  await page.locator('#lms-connect:not([disabled])').waitFor();assert.equal(await page.locator('#content input[type="password"]').count(),0);await page.locator('#lms-connect').click();
+  await page.locator('#lms-connect:not([disabled])').waitFor();assert.equal(await page.locator('#lms-signin input[type="password"]').count(),1);await page.locator('#lms-connect').click();
   await page.locator('#lms-confirm').click();
   await page.locator('#lms-course-picker').waitFor({state:'visible'});
   assert.equal(await page.locator('.sidebar .avatar').innerText(),'김');assert.equal(await page.locator('#lms-connection-title').innerText(),'김숭실');
@@ -94,6 +95,16 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
   await page.evaluate(()=>location.hash='login');currentUser=100;loggedIn=false;await page.locator('#lms-connect').click();await page.locator('#lms-confirm').click();
   await page.locator('#lms-course-picker').waitFor({state:'visible'});
   assert.equal(await page.locator('#lms-result').isVisible(),false);assert.equal(await page.locator('#lms-courses input:checked').count(),0);
+  // Signing in with the school ID and password: a refusal says why and empties the password; the right one signs in.
+  await page.locator('#lms-disconnect').click();await page.locator('#lms-signin').waitFor({state:'visible'});
+  await page.locator('#lms-user-id').fill('20201234');await page.locator('#lms-password').fill('wrong-pass');await page.locator('#lms-signin-submit').click();
+  await page.locator('#lms-message',{hasText:'학번 또는 비밀번호가 맞지 않아요'}).waitFor();
+  assert.equal(await page.locator('#lms-password').inputValue(),'');assert.equal(await page.locator('#lms-user-id').inputValue(),'20201234');
+  await page.locator('#lms-password').fill('right-pass');await page.locator('#lms-password').press('Enter');
+  await page.locator('#lms-course-picker').waitFor({state:'visible'});
+  assert.equal(await page.locator('#lms-signin').isVisible(),false);assert.equal(await page.locator('.sidebar .avatar').count(),1);
+  assert.deepEqual(signIns,['20201234','20201234']);assert.doesNotMatch(JSON.stringify(app.view()),/right-pass/);
+  assert.equal(await page.evaluate(()=>JSON.stringify({...localStorage})+document.cookie).then(text=>/right-pass|wrong-pass/.test(text)),false);
   assert.deepEqual(failures,[]);
 });
 

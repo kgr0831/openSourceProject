@@ -3,6 +3,15 @@ import os from 'node:os';
 import {randomUUID} from 'node:crypto';
 import {LmsConnection, SessionStore, collectLms, calendarEvents, LmsError, friendlyError} from '../lms-parser/index.mjs';
 
+// A hosted server has no desktop: every signed-in student gets an isolated context in one hidden browser,
+// and no school session is written to disk.
+let hostedBrowser;
+export async function hostedSession() {
+  const {browserSession, sharedBrowser} = await import('../lms-parser/browser.mjs');
+  hostedBrowser ||= sharedBrowser();
+  return browserSession({channel: 'chromium', launch: hostedBrowser});
+}
+
 // The project and the personal download app share code, not login stores or jobs.
 export class LmsCalendarService extends LmsConnection {
   constructor({collect = collectLms, ...options} = {}) {

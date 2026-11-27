@@ -2,6 +2,7 @@ import {evaluateCareer} from './career.mjs';
 import {createProgramSource,prepareProgramData} from './program-data.mjs';
 import {evaluatePrograms} from './programs.mjs';
 import http from 'node:http';
+import {createHash,randomBytes} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -44,7 +45,8 @@ const calendarAssets=new Map([
   ['calendar.js','all/global.js'], ['theme.js','themes/monarch/global.js'], ['ko.js','locales/ko/global.js'],
   ['skeleton.css','skeleton.css'], ['theme.css','themes/monarch/theme.css'], ['palette.css','themes/monarch/palettes/blue.css']
 ]);
-export function createTimetableServer({port=4317,bridge=new CodexBridge(),scheduler=liveScheduler,programSource=createProgramSource(),programNow=()=>new Date(),createLms=async()=>new (await import('./lms-service.mjs')).LmsCalendarService()}={}) {
+export function createTimetableServer({port=4317,bridge=new CodexBridge(),scheduler=liveScheduler,programSource=createProgramSource(),programNow=()=>new Date(),lmsSessions=process.env.LMS_SESSIONS==='1',now=()=>Date.now(),
+  createLms=async()=>{const {LmsCalendarService,hostedSession}=await import('./lms-service.mjs');return new LmsCalendarService(lmsSessions?{windowLogin:false,createSession:hostedSession}:{})}}={}) {
 const {defaultRequest,getCourses,catalogInfo,generateCandidates,validateRequest,validateAiResult,outputSchema,applyIntent,intentSchema}=scheduler;
 let recommendationBusy=false,lmsPromise=null,lms=null;
 async function recommendWithGuidance(request,options){
@@ -54,6 +56,33 @@ async function recommendWithGuidance(request,options){
 async function getLms(){
   if(!lmsPromise)lmsPromise=Promise.resolve().then(createLms).then(app=>{lms=app;app.resume();return app}).catch(()=>{lmsPromise=null;throw new Error('LMS 구성 요소를 준비하지 못했어요. 시간표 데모 시작 파일을 다시 실행해 주세요.')});
   return lmsPromise;
+}
+// On a student's PC there is one school session. With lmsSessions (a hosted server) each signed-in visitor has a seat,
+// found by a cookie that only the LMS routes receive. A seat holds a school session, never a password.
+// ponytail: eight seats fit one hidden browser on a 2 GB server; raise it with the server, or queue sign-ins instead.
+const seats=new Map(),seatLimit=8,seatIdle=30*60*1000,signIns=[];
+const blankLms={revision:0,connection:'disconnected',windowLogin:false,remembered:false,accountKey:null,accountName:null,courses:[],notice:null,job:null,result:null};
+const seatCookie=(sid,age=86400)=>`lms_sid=${sid}; Path=/api/lms; HttpOnly; Secure; SameSite=Strict; Max-Age=${age}`;
+const seatOf=req=>{const sid=(req.headers.cookie||'').match(/(?:^|;\s*)lms_sid=([\w-]{43})(?:;|$)/)?.[1],seat=seats.get(sid);if(seat)seat.seen=now();return seat};
+const seatBusy=seat=>seat.app.running||!['connected','disconnected','error'].includes(seat.app.state.connection);
+async function closeSeat(seat){seats.delete(seat.sid);await seat.app.close().catch(()=>{})}
+async function openSeat(){
+  if(seats.size>=seatLimit){
+    // Make room: a seat that never signed in goes first, then the one unused for longest. Work in progress is never cut off.
+    const free=[...seats.values()].filter(seat=>!seatBusy(seat)).sort((a,b)=>(a.app.state.connection==='connected')-(b.app.state.connection==='connected')||a.used-b.used)[0];
+    if(!free)return null;
+    await closeSeat(free);
+  }
+  const seat={sid:randomBytes(32).toString('base64url'),app:await createLms(),seen:now(),used:now()};
+  seats.set(seat.sid,seat);return seat;
+}
+const seatSweep=setInterval(()=>{for(const seat of seats.values())if(now()-seat.seen>seatIdle&&!seatBusy(seat))closeSeat(seat)},60000);seatSweep.unref();
+// A sign-in is relayed to the school, so guessing is slowed here: per account, per address and overall, in ten minutes.
+function allowSignIn(address,userId){
+  const time=now(),who=createHash('sha256').update(String(userId)).digest('hex').slice(0,16);
+  while(signIns.length&&time-signIns[0].time>600000)signIns.shift();
+  if(signIns.length>=120||signIns.filter(entry=>entry.address===address).length>=20||signIns.filter(entry=>entry.who===who).length>=5)return false;
+  signIns.push({time,address,who});return true;
 }
 const server=http.createServer(async(req,res)=>{
   const activePort=server.address()?.port||port,localUrl=`http://127.0.0.1:${activePort}`;
@@ -91,7 +120,7 @@ const server=http.createServer(async(req,res)=>{
           selectedCourseCount:selected.length,selectedSectionCount:selected.reduce((count,course)=>count+course.sections.length,0),
           selectedUnavailableSectionCount:selected.reduce((count,course)=>count+course.sections.filter(section=>!section.meetings.length).length,0)}});
     }
-    if(req.method==='GET' && url.pathname==='/api/lms/state')return reply(res,200,(await getLms()).view());
+    if(req.method==='GET' && url.pathname==='/api/lms/state')return reply(res,200,lmsSessions?seatOf(req)?.app.view()||blankLms:(await getLms()).view());
     if(req.method==='GET' && url.pathname==='/api/status')return reply(res,200,{...await bridge.status(),busy:recommendationBusy||bridge.busy});
     if(req.method!=='POST')return reply(res,404,{error:'페이지를 찾을 수 없습니다.'});
     if(req.headers['x-timetable-app']!=='1')return reply(res,403,{error:'앱 화면에서 다시 시도해 주세요.'});
@@ -105,11 +134,29 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname.startsWith('/api/lms/')){
       const actions={'/api/lms/connect':app=>app.connect(),'/api/lms/confirm-login':app=>app.confirmLogin(),
         '/api/lms/focus-login':app=>app.focusLogin(),'/api/lms/disconnect':app=>app.disconnect({forget:true}),
-        '/api/lms/collect':app=>app.start({courseIds:body?.courseIds}),'/api/lms/cancel':app=>app.cancel()};
+        '/api/lms/collect':app=>app.start({courseIds:body?.courseIds}),'/api/lms/cancel':app=>app.cancel(),
+        '/api/lms/sign-in':app=>app.signIn({userId:body?.userId,password:body?.password})};
       if(!Object.hasOwn(actions,url.pathname))return reply(res,404,{error:'요청을 찾을 수 없습니다.'});
-      const app=await getLms();
-      try{await actions[url.pathname](app);return reply(res,200,app.view())}
-      catch(error){return reply(res,400,{error:friendlyError(error)})}
+      const signIn=url.pathname==='/api/lms/sign-in';
+      // Behind the hosted proxy the visitor's address arrives in X-Real-IP; on a PC every request is the student's own.
+      if(signIn&&!allowSignIn(lmsSessions&&req.headers['x-real-ip']||req.socket.remoteAddress,body?.userId))return reply(res,429,{error:'로그인 시도가 많아요. 10분 뒤 다시 시도해 주세요.'});
+      let app,seat;
+      if(!lmsSessions)app=await getLms();
+      else{
+        seat=seatOf(req);
+        if(!seat&&signIn){
+          seat=await openSeat();
+          if(!seat)return reply(res,503,{error:'지금은 로그인한 사람이 많아요. 잠시 후 다시 시도해 주세요.'});
+          res.setHeader('Set-Cookie',seatCookie(seat.sid));
+        }
+        if(!seat)return reply(res,400,{error:friendlyError({code:'NOT_CONNECTED'})});
+        seat.used=now();app=seat.app;
+      }
+      try{
+        await actions[url.pathname](app);
+        if(seat&&url.pathname==='/api/lms/disconnect'){await closeSeat(seat);res.setHeader('Set-Cookie',seatCookie('',0));return reply(res,200,blankLms)}
+        return reply(res,200,app.view());
+      }catch(error){return reply(res,400,{error:friendlyError(error)})}
     }
     if(recommendationBusy&&['/api/connect','/api/cancel'].includes(url.pathname))throw new Error('추천이 끝난 뒤 계정을 변경해 주세요.');
     if(url.pathname==='/api/career'){
@@ -147,7 +194,7 @@ const server=http.createServer(async(req,res)=>{
   }catch(error){if(!res.destroyed)reply(res,error.code?.startsWith('ENGINE_')?503:400,{error:error.message||'요청을 처리하지 못했습니다.',code:error.code})}
 });
 server.requestTimeout=300000;
-server.closeServices=async()=>{bridge.close();ortoolsProvider.close();if(lmsPromise)await lmsPromise.catch(()=>{});await lms?.close()};
+server.closeServices=async()=>{clearInterval(seatSweep);bridge.close();ortoolsProvider.close();if(lmsPromise)await lmsPromise.catch(()=>{});await lms?.close();await Promise.all([...seats.values()].map(closeSeat))};
 return server;
 }
 

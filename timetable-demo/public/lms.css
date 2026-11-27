@@ -9,8 +9,20 @@
 .lms-panel .badge{padding:3px 10px;border-radius:999px;background:var(--brand-soft);color:var(--brand-strong);font-size:.75rem;font-weight:700;white-space:nowrap}
 .lms-panel .badge.neutral{background:var(--fill);color:var(--ink-3)}
 .lms-actions{display:flex;flex-wrap:wrap;gap:8px}
-#lms-connect{inline-size:100%}
+.lms-signin{display:contents}
+#lms-signin-submit{order:1}
+#lms-login-help{order:2}
+.lms-connect-row > .lms-actions{order:3}
+.lms-signin .privacy-note{order:1;color:var(--ink-2)}
+#lms-password[aria-invalid]{border-color:var(--danger)}
+#lms-sync:disabled{opacity:1;background:var(--fill-2);color:var(--ink-3)}
+.lms-field{display:grid;gap:6px;color:var(--ink-2);font-size:.875rem;font-weight:600}
+#lms-signin-submit{inline-size:100%;margin-block-start:4px}
+#lms-connect{justify-content:flex-start;padding-inline:0;color:var(--ink-2);font-size:.875rem;text-align:start;text-decoration:underline;text-underline-offset:3px}
 .lms-panel.signed-in .lms-connect-row{grid-template-columns:minmax(0,1fr) auto;align-items:center}
+.lms-panel.signed-in .lms-identity{grid-area:1 / 1}
+.lms-panel.signed-in .lms-connect-row > .lms-actions{grid-area:1 / 2}
+.lms-connect-row > .message{grid-column:1 / -1}
 .lms-panel .message{padding:12px 16px;border-radius:var(--radius-m);background:var(--brand-soft);color:var(--brand-strong);font-size:.875rem;line-height:1.5}
 .lms-panel .message.error{background:var(--danger-soft);color:#b3261e}
 #lms-course-picker{display:grid;gap:10px;padding-block-start:18px;border-block-start:1px solid var(--line)}
