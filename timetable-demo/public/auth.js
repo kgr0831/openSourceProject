@@ -1,5 +1,5 @@
-﻿// Auth client for backend at http://localhost:4000
-export const AUTH_BASE_URL = 'http://localhost:4000';
+﻿// Same-origin auth client: the hosted nginx and the local timetable server both route /auth to the community API.
+export const AUTH_BASE_URL = '';
 
 async function request(endpoint, options = {}) {
   const url = `${AUTH_BASE_URL}${endpoint}`;
@@ -14,7 +14,7 @@ async function request(endpoint, options = {}) {
       ...options
     });
   } catch (err) {
-    throw new Error('백엔드 서버(http://localhost:4000)에 연결할 수 없습니다. 서버가 실행 중인지 확인해 주세요.');
+    throw new Error('로그인 서버에 연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.');
   }
 
   let data = null;

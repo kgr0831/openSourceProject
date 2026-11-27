@@ -1,13 +1,24 @@
-.screen.planner-screen {
-  inline-size: 100%;
-  max-inline-size: none;
+:root {
+  --fc-monarch-primary: #18233a;
+  --fc-monarch-primary-over: #36425a;
+  --fc-monarch-primary-down: #5b6577;
+  --fc-monarch-secondary: #fff6c7;
+  --fc-monarch-secondary-foreground: #18233a;
+  --fc-monarch-secondary-over: #fff0a8;
+  --fc-monarch-secondary-down: #ffe98a;
+  --fc-monarch-tertiary: #ffe45c;
+  --fc-monarch-tertiary-foreground: #18233a;
+  --fc-monarch-tertiary-over: #f5d84a;
+  --fc-monarch-tertiary-down: #ebcd3c;
+  --fc-monarch-highlight: #ffe45c33;
+  --fc-monarch-selected: #18233a;
+  --fc-monarch-selected-over: #36425a;
+  --fc-monarch-selected-down: #5b6577;
+  --fc-monarch-outline: #2f5bea;
 }
 
 .planner-screen .screen-body {
-  min-inline-size: 0;
-  gap: 16px;
-  padding-block: clamp(12px, 2.4vw, 28px) 24px;
-  padding-inline: max(clamp(10px, 2.4vw, 32px), env(safe-area-inset-left)) max(clamp(10px, 2.4vw, 32px), env(safe-area-inset-right));
+  --content: 1440px;
 }
 
 .planner-screen :is(.button, .bottom-nav a),
@@ -19,52 +30,6 @@
 .planner-dialog .icon-button {
   min-inline-size: 44px;
   flex-shrink: 0;
-}
-
-.planner-page-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-}
-
-.planner-page-heading .heading h1 {
-  font-size: clamp(1.35rem, 2.4vw, 1.9rem);
-}
-
-.planner-page-heading .button {
-  inline-size: auto;
-}
-
-.planner-screen .saved-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.planner-screen .schedule-main {
-  min-inline-size: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.planner-screen .saved-side {
-  display: grid;
-  gap: 10px;
-  min-inline-size: 0;
-}
-
-.saved-side h2 {
-  font-size: 1rem;
-}
-
-.saved-side .next-class {
-  overflow-wrap: anywhere;
 }
 
 .planner-screen .timetable-surface,
@@ -84,7 +49,7 @@
 .planner-grid-guide {
   display: none;
   margin: 0 0 8px;
-  color: #435371;
+  color: var(--muted);
   font-size: 0.8125rem;
 }
 
@@ -95,7 +60,7 @@
 .planner-grid-frame[data-mode="week"] .planner-grid-scroll {
   overflow-x: auto;
   overscroll-behavior-inline: contain;
-  scrollbar-color: #8197b5 #eef2f7;
+  scrollbar-color: var(--ink-300) var(--sunken);
   border-radius: 10px;
 }
 
@@ -167,7 +132,7 @@
 .calendar-mode {
   flex-wrap: wrap;
   max-inline-size: 100%;
-  background: #edf1f7;
+  background: var(--sunken);
   padding: 3px;
   border-radius: 12px;
 }
@@ -181,9 +146,9 @@
 }
 
 .calendar-mode .button[aria-pressed="true"] {
-  color: #153a75;
+  color: var(--ink-900);
   background: #fff;
-  box-shadow: 0 1px 3px #233f681f;
+  box-shadow: 0 0 0 1px var(--line);
 }
 
 .calendar-navigation {
@@ -241,8 +206,8 @@
 }
 
 #semester-calendar [data-calendar-selected] {
-  background: #edf4ff;
-  box-shadow: inset 0 2px #4572b6;
+  background: var(--marker-soft);
+  box-shadow: inset 0 3px var(--ink-900);
 }
 
 #semester-calendar .calendar-event {
@@ -343,7 +308,7 @@
 
 #semester-calendar :is(.calendar-event, .calendar-date-link, .calendar-more):focus-visible,
 .planner-grid-scroll:focus-visible {
-  outline: 2px solid #234980;
+  outline: 3px solid var(--focus);
   outline-offset: -2px;
 }
 
@@ -467,57 +432,6 @@
 .planner-confirm-actions .button {
   padding-inline: 8px;
   inline-size: auto;
-}
-
-@media (min-width: 76rem) {
-  .planner-screen .saved-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(14rem, 18rem);
-    gap: 20px;
-  }
-}
-
-@media (max-width: 999px) {
-  .screen.planner-screen {
-    block-size: 100dvh;
-    min-block-size: 0;
-    margin: 0;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-  }
-
-  .planner-screen .mobile-header {
-    flex: none;
-    block-size: auto;
-    min-block-size: 52px;
-    padding-block-start: env(safe-area-inset-top);
-    padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
-    border-radius: 0;
-  }
-
-  .planner-page-heading .heading h1 {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .planner-page-heading .heading p {
-    margin-block: 0;
-  }
-
-  .planner-screen .bottom-nav {
-    block-size: auto;
-    min-block-size: 0;
-    padding: 4px max(10px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
-  }
-
-  .planner-screen .bottom-nav a {
-    gap: 2px;
-    font-size: 0.75rem;
-  }
 }
 
 @media (max-width: 42rem) {
