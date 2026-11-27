@@ -332,11 +332,17 @@ function advancedView(){
     '<div><details class="disclosure"><summary>학점 범위 직접 설정</summary><div class="stack compact">'+creditFields()+'<small>같은 숫자를 넣으면 정확히 맞춰요.</small></div></details>'+creditFeedback()+'</div>',
     liveWeek(),builderActions(stepLink('선호 저장하기','preferences'))),'builder-body');
 }
+const optionFigures=[['등교일 적게',o=>o.metrics.days],['공강 짧게',o=>o.metrics.gapMinutes],['하루 수업 짧게',longestDay]];
+function optionName(c){
+  if(/^AI/.test(c.strategy||''))return c.strategy;
+  const win=optionFigures.find(([,value])=>state.options.every(o=>o===c||value(c)<value(o)));
+  return win&&state.options.length>1?win[0]:'추천 '+('ABCDE'[state.options.indexOf(c)]||'');
+}
 // Each option is shown as its own small week, so the choice is made by looking, not by reading.
 function comparisonCard(c,i){
   return '<button class="comparison-card '+(i===state.active?'selected':'')+'" data-action="candidate" data-value="'+i+'" aria-pressed="'+(i===state.active)+'">'+
     miniWeek(c.sections,{days:Math.max(5,...c.sections.flatMap(s=>s.meetings.map(m=>m[0]+1)))})+
-    '<span class="comparison-copy"><span class="comparison-card-title"><span class="option-letter" aria-hidden="true">'+('ABCDE'[i]||i+1)+'</span><strong>'+esc(c.strategy)+'</strong>'+(i===state.active?icon('check'):'')+'</span>'+
+    '<span class="comparison-copy"><span class="comparison-card-title"><span class="option-letter" aria-hidden="true">'+('ABCDE'[i]||i+1)+'</span><strong>'+esc(optionName(c))+'</strong>'+(i===state.active?icon('check'):'')+'</span>'+
     '<span class="comparison-stats">'+[['calendar',o=>o.metrics.days,v=>'주 '+v+'일'],['clock',longestDay,v=>'하루 최대 '+duration(v)],['lunch',o=>o.metrics.gapMinutes,v=>'공강 '+duration(v)]].map(([name,value,text])=>
       '<span'+(state.options.some(o=>value(o)!==value(c))?' class="differs"':'')+'>'+icon(name)+text(value(c))+'</span>').join('')+'</span></span></button>';
 }
@@ -352,7 +358,7 @@ function resultsView(){
     '<div class="comparison-list">'+state.options.map(comparisonCard).join('')+'</div>'+
     '<section class="criteria" aria-label="모든 추천안에서 지킨 조건"><h2>지킨 조건</h2><ul>'+kept.map(text=>'<li>'+icon('check')+'<span>'+text+'</span></li>').join('')+'</ul></section>'+
     '<div class="panel-links">'+link(icon('sliders')+'<span>조건 다시 조정하기</span>'+icon('chevron'),'preferences','row')+'</div>';
-  const week='<div class="week-card-head"><h2><span class="option-letter" aria-hidden="true">'+letter+'</span>'+esc(c.strategy)+'</h2><p class="fact-row"><span>'+icon('cap')+c.credits+'학점</span><span>'+icon('sun')+'첫 수업 '+timeText(earliest)+'</span></p></div>'+
+  const week='<div class="week-card-head"><h2><span class="option-letter" aria-hidden="true">'+letter+'</span>'+esc(optionName(c))+'</h2><p class="fact-row"><span>'+icon('cap')+c.credits+'학점</span><span>'+icon('sun')+'첫 수업 '+timeText(earliest)+'</span></p></div>'+
     candidateTravelNotice(c.sections)+'<div class="week-preview timetable-surface"><div class="week-grid">'+timetable(c)+'</div></div>'+changesNotice(c)+
     '<div class="recommendation-reason"><p class="accent-text">'+flags.map(f=>'<span>'+icon('check')+f+'</span>').join('')+'</p>'+(c.metrics.lunchMissedDays?'<small>점심 1시간을 확보하지 못한 날이 '+c.metrics.lunchMissedDays+'일 있어요.</small>':'')+'</div>'+
     '<details class="disclosure"><summary>과목과 추천 이유</summary>'+(c.careerAssessment?'<p>희망 진로: '+esc(c.careerAssessment.goal)+'</p><small>'+esc(c.careerAssessment.notice)+'</small>':'')+'<p>'+esc(c.aiReason||'필수 조건을 지킨 유효 후보 중 서로 다른 시간표를 골랐어요.')+'</p>'+c.sections.map(s=>'<p>'+esc(s.name)+' · '+s.credits+'학점'+(c.careerAssessment?.evaluations.find(e=>e.courseId===s.courseId&&e.relevance!=='uncertain')?'<br>'+esc(c.careerAssessment.evaluations.find(e=>e.courseId===s.courseId).reason):'')+'</p>').join('')+'<p>'+esc(c.solverResult?.ranking_proven?'선택한 기준에서 우선순위를 확인한 결과예요.':'시간 안에 찾은 결과예요. 더 좋은 조합이 있을 수 있어요.')+'</p>'+'<p>적용 조건: '+applied.allowedDays.map(d=>dayNames[d]).join('·')+' / '+timeText(applied.earliestStart)+'–'+timeText(applied.latestEnd)+' / 총 '+applied.credits.total.min+'–'+applied.credits.total.max+'학점</p>'+(state.interpretation?.summary?'<p>'+esc(state.interpretation.summary)+'</p>':'')+(state.interpretation?.unsupported?.length?'<p>반영하지 못한 요청: '+state.interpretation.unsupported.map(esc).join(', ')+'</p>':'')+'<small>'+esc(state.catalogInfo.notice||'')+'</small></details>';
@@ -382,7 +388,7 @@ function savedView(){
     '<button class="next-class '+courseColor(first.courseId)+'" data-action="section" data-id="'+esc(first.courseId)+'"><span class="next-dot" aria-hidden="true"></span><span class="next-copy"><strong>'+esc(first.name)+'</strong></span>'+icon('chevron')+'</button>';
   const days=c.metrics?.days??new Set(c.sections.flatMap(s=>s.meetings.map(m=>m[0]))).size;
   const weeklyMinutes=c.sections.flatMap(s=>s.meetings).reduce((sum,[,from,to])=>sum+to-from,0);
-  const todayRows=active.filter(e=>e.date===today&&e.kind==='class').sort((a,b)=>a.start-b.start).map(e=>'<li><button class="agenda-row'+(e.end<=now?' past':'')+' '+(e.courseId?courseColor(e.courseId):'')+'" data-action="open-event" data-id="'+esc(e.id)+'"><span class="next-dot" aria-hidden="true"></span><span><strong>'+esc(e.title)+'</strong><small>'+esc([timeText(e.start)+'–'+timeText(e.end),e.location].filter(Boolean).join(' · '))+'</small></span></button></li>').join('');
+  const todayRows=active.filter(e=>e.date===today&&e.kind==='class').sort((a,b)=>a.start-b.start).map(e=>'<li><button class="agenda-row '+(e.courseId?courseColor(e.courseId):'')+'" data-action="open-event" data-id="'+esc(e.id)+'"><span class="next-dot" aria-hidden="true"></span><span><strong>'+esc(e.title)+(e.end<=now?'<span class="course-tag">종료</span>':'')+'</strong><small>'+esc([timeText(e.start)+'–'+timeText(e.end),e.location].filter(Boolean).join(' · '))+'</small></span></button></li>').join('');
   const rows=agenda.map(e=>'<li><button class="agenda-row" data-action="open-event" data-id="'+esc(e.id)+'"><span class="agenda-date '+(e.date===today?'today':'')+'">'+esc(relativeDay(e.date,today))+'</span><span><strong>'+esc(e.title)+'</strong><small>'+esc([e.source==='lms'?lmsTimeLabel(e):timeText(e.start),e.location].filter(Boolean).join(' · '))+'</small></span></button></li>').join('');
   return body('<div class="page-head"><div class="heading"><h1 tabindex="-1">'+(todayClasses?'오늘 수업 '+todayClasses+'개':weekday+'요일, 수업 없음')+'</h1><p>'+esc(calendarDateLabel(today))+' · '+semesterLabel()+'</p></div>'+
     '<div class="head-actions">'+link(icon('download')+'<span>내보내기</span>','export','secondary small')+link(icon('pencil')+'<span>다시 비교</span>',state.options.length?'results':'preferences','secondary small')+'</div></div>'+
@@ -728,7 +734,7 @@ function confirmSemester(){
   const min=semester?.effectiveDate||start,effective=today<min?min:today>end?end:today;
   const dates=semester?field('새 시간표 적용 시작일','<input name="effectiveDate" type="date" required min="'+min+'" max="'+end+'" value="'+effective+'">'):
     field('학기 시작일','<input name="start" type="date" required value="'+start+'">')+field('학기 종료일','<input name="end" type="date" required value="'+end+'">');
-  dialog(changesNotice(current())+'<div class="dialog-heading"><h2 id="dialog-title">이번 학기 시간표로 저장</h2>'+button(icon('close'),'close-dialog','icon-button','aria-label="닫기"')+'</div><form id="semester-form" class="stack">'+dates+'<p id="semester-error" class="form-error" role="alert"></p><button type="submit" class="button primary">'+(semester?'시간표 변경 미리보기':'내 시간표로 저장')+'</button></form>');
+  dialog(changesNotice(current())+'<div class="dialog-heading"><h2 id="dialog-title">이번 학기 시간표로 저장</h2>'+button(icon('close'),'close-dialog','icon-button','aria-label="닫기"')+'</div><form id="semester-form" class="stack">'+dates+'<p id="semester-error" class="form-error" role="alert"></p><button type="submit" class="button primary">'+(semester?'시간표 변경 미리보기':'저장')+'</button></form>');
 }
 function showSection(courseId){
   const c=state.route==='saved'?store.data.semester?.candidate:current(),s=c?.sections.find(s=>s.courseId===courseId);if(!s)return;

@@ -91,7 +91,7 @@ export function timetable(candidate,action='section',{fullDetails=false,window=n
     const [,from,to]=meeting,location=sectionLocation(s,s.meetings.indexOf(meeting));
     const time=timeText(from)+'–'+timeText(to);
     const label=[s.name,dayNames[day]+' '+time,location,s.note].filter(Boolean).join(', ');
-    const details=s.note?'<span class="class-detail"><span>'+esc(s.note)+'</span></span>':'<span class="class-detail">'+(fullDetails?'<span>'+time+'</span>':'')+(location?'<span class="room">'+esc(location)+'</span><span class="room short">'+esc(location.replace(/^(\S{2})\S*\s+(?=\S*\d)/,'$1 '))+'</span>':'')+'</span>';
+    const details=s.note?'<span class="class-detail"><span>'+esc(s.note)+'</span></span>':'<span class="class-detail">'+(fullDetails?'<span>'+time+'</span>':'')+(location?'<span class="room">'+esc(location)+'</span><span class="room short">'+esc(location.match(/\S*\d\S*$/)?.[0]||location)+'</span>':'')+'</span>';
     const [lane,count]=lanes.get(meeting)||[0,1];
     return `<button class="class-block ${/is-preview/.test(s.variant||'')?'':courseColor(s.courseId)} ${s.variant||''}" ${count>1?`data-lane="${lane}" data-lanes="${count}"`:''} data-action="${action}" data-id="${esc(s.courseId)}" data-offset="${(from-start)/(end-start)*100}" data-length="${(to-from)/(end-start)*100}" aria-label="${esc(label)}" title="${esc(label)}"><strong>${esc(fullDetails?s.name:s.shortName||s.name)}</strong>${details}</button>`;
   }).join('')).join('')}</div>`).join('');
