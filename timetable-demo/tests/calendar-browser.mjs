@@ -402,7 +402,7 @@ async function assertSheetActions(page, viewportHeight) {
 }
 
 async function navigatePlanner(page, route, tap = false) {
-  const link = page.locator((tap ? '.bottom-nav' : '.topnav') + ' a[href="#' + route + '"]');
+  const link = page.locator((tap ? '.bottom-nav' : '.side-nav') + ' a[href="#' + route + '"]');
   await (tap ? link.tap() : link.click());
   await page.locator('.planner-screen[data-route="' + route + '"]').waitFor();
 }
@@ -436,7 +436,7 @@ test('Chromium 터치 화면 320–768px과 가로 회전에서 격자·일간 �
     await navigatePlanner(page, 'saved', true);
     await assertPlannerWidth(page, width);
     const savedGrid = page.locator('#saved-grid-scroll');
-    assert.equal(await savedGrid.evaluate(el => el.scrollWidth > el.clientWidth), width < 640);
+    assert.equal(await savedGrid.evaluate(el => el.scrollWidth > el.clientWidth), false, '월~금이 좌우 이동 없이 한 화면에 보인다');
     await navigatePlanner(page, 'calendar', true);
     assert.deepEqual(await saved(), initial);
   }
