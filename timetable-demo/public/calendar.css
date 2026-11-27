@@ -1,4 +1,5 @@
 :root {
+  --fc-monarch-muted-foreground: #5d6562;
   --fc-monarch-primary: #0b7a63;
   --fc-monarch-primary-over: #096350;
   --fc-monarch-primary-down: #074c3e;
@@ -48,10 +49,16 @@
   min-inline-size: 0;
 }
 
-/* The frame keeps the rounded border; a wide week scrolls inside it. */
+/* The frame keeps the rounded border; a wide week scrolls inside it and the library's own frame is dropped. */
 .calendar-surface .planner-grid-scroll {
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 22px;
+}
+
+#semester-calendar > div > div {
+  border: 0;
+  border-radius: 0;
 }
 
 .planner-grid-frame[data-mode="week"] .planner-grid-scroll {
@@ -189,7 +196,14 @@
 }
 
 #semester-calendar [data-calendar-selected] {
-  background: var(--brand-soft);
+  background: rgb(32 197 160 / 0.08);
+}
+
+#semester-calendar[data-calendar-view="week"] [data-calendar-axis] {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 4;
+  background: var(--bg);
 }
 
 #semester-calendar .calendar-event {
@@ -304,8 +318,16 @@
   overflow-wrap: anywhere;
 }
 
+#semester-calendar[data-calendar-view="day"] {
+  padding: 0 8px 8px 0;
+}
+
+#semester-calendar[data-calendar-view="day"] .calendar-event-time {
+  font-weight: 600;
+}
+
 #semester-calendar[data-calendar-view="day"] .calendar-event-kind {
-  grid-row: 2;
+  grid-row: 4;
 }
 
 #semester-calendar[data-calendar-view="day"] .calendar-event-location {
@@ -474,4 +496,26 @@
 #semester-calendar[data-calendar-view="week"] .calendar-event-content > * {
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+/* Daily list: every entry is a filled rounded row; the library's dot and left rule are dropped. */
+#semester-calendar[data-calendar-view="day"] .calendar-event {
+  border-inline-start-width: 0;
+  border-radius: 14px;
+  padding-inline: 14px;
+  background-color: var(--calendar-event-fill);
+}
+
+#semester-calendar[data-calendar-view="day"] .calendar-event.course-colored {
+  background-color: var(--block);
+}
+
+#semester-calendar[data-calendar-view="day"] .calendar-event > :first-child:empty {
+  display: none;
+}
+
+#semester-calendar[data-calendar-view="day"] .calendar-event-kind {
+  padding-inline: 8px;
+  border-radius: 999px;
+  background: #fff;
 }

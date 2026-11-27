@@ -97,7 +97,7 @@ function renderHeader(){
   const route=state.route,step=({courses:1,preferences:2,advanced:2,loading:3,results:3})[route];
   const backButton=!['start','saved','career','career-list','programs','calendar'].includes(route)?button(icon('back'),'back','icon-button','aria-label="이전 화면"'):'';
   const extra=step?'<span class="step-label">'+step+' / 3</span>':
-    route==='saved'?link(icon('refresh'),state.options.length?'results':'preferences','icon-button','aria-label="추천안 다시 비교"')+link(icon('download'),'export','icon-button','aria-label="캘린더 파일 내보내기"')+button(icon('plus'),'new','icon-button','aria-label="새 시간표 만들기"'):
+    route==='saved'?link(icon('refresh'),state.options.length?'results':'preferences','icon-button','aria-label="추천안 다시 비교"')+link(icon('download'),'export','icon-button','aria-label="캘린더 파일 내보내기"')+button(icon('plus'),'new','icon-button','aria-label="새 시간표 만들기"')+link(icon('user'),'login','icon-button','aria-label="'+(state.user?'계정':'LMS 로그인')+'"'):
     ['start','career','career-list','programs','calendar'].includes(route)?link(icon('user'),'login','icon-button','aria-label="'+(state.user?'계정':'LMS 로그인')+'"'):'';
   return '<header class="mobile-header'+(step?' flow-header':'')+'">'+backButton+'<span class="page-name">'+(route==='start'?brandMark:'')+titles[route]+'</span>'+(step?flowProgress():'')+extra+'</header>';
 }
@@ -218,7 +218,7 @@ function builderActions(action){
 }
 function liveWeek(){
   const {total}=selectedCredits(state.courses,state.request.requiredCourseIds);
-  return '<div class="week-card-head"><h2>내 한 주</h2><div class="credit-meter">'+icon('cap')+'<strong id="credit-meter-label">'+creditMeterLabel(total)+'</strong></div></div>'+
+  return '<div class="week-card-head"><h2>내 한 주</h2><div class="credit-meter">'+icon('book')+'<strong id="credit-meter-label">'+creditMeterLabel(total)+'</strong></div></div>'+
     '<div id="week-preview" class="week-preview">'+weekPreview()+'</div>';
 }
 // Sections come from the compatibility check when it has answered, and from the catalog until then, so a picked course shows at once.
@@ -312,7 +312,7 @@ function preferencesView(){
     ? '<section class="selected-course-times" aria-labelledby="course-times-heading"><h2 id="course-times-heading">분반 시간</h2><div id="selected-course-times"></div></section>' : '';
   return body(workspace(heading('원하는 한 주')+
     '<div class="pref-list">'+
-    prefRow('cap','<label for="target-credits">목표 학점</label>','<div class="credit-target">'+button(icon('minus'),'credit-step','stepper','data-value="-1" aria-label="학점 줄이기"')+'<input aria-describedby="credit-ranges-summary credit-check" id="target-credits" type="number" step="0.5" min="0.5" max="24" value="'+creditValue(goal)+'">'+button(icon('plus'),'credit-step','stepper','data-value="1" aria-label="학점 늘리기"')+'<span id="credit-ranges-summary">'+creditRangesSummary()+'</span></div>'+creditFeedback())+
+    prefRow('book','<label for="target-credits">목표 학점</label>','<div class="credit-target">'+button(icon('minus'),'credit-step','stepper','data-value="-1" aria-label="학점 줄이기"')+'<input aria-describedby="credit-ranges-summary credit-check" id="target-credits" type="number" step="0.5" min="0.5" max="24" value="'+creditValue(goal)+'">'+button(icon('plus'),'credit-step','stepper','data-value="1" aria-label="학점 늘리기"')+'<span id="credit-ranges-summary">'+creditRangesSummary()+'</span></div>'+creditFeedback())+
     '<div class="pref-row" role="group" aria-labelledby="days-label"><span class="pref-icon">'+icon('calendar')+'</span><div class="pref-main"><span class="pref-label" id="days-label">등교 요일</span><div class="day-picker">'+dayNames.map((d,i)=>'<label><input type="checkbox" data-day="'+i+'" '+(r.allowedDays.includes(i)?'checked':'')+'><span>'+d+'</span></label>').join('')+'</div></div></div>'+
     prefRow('clock','수업 시간','<div class="time-range"><select id="earliestStart" aria-label="수업 시작 가능 시간">'+timeOptions(r.earliestStart)+'</select><span aria-hidden="true">–</span><select id="latestEnd" aria-label="수업 종료 한도">'+timeOptions(r.latestEnd)+'</select></div>')+
     '</div>'+courseTimes+
@@ -357,7 +357,7 @@ function resultsView(){
     '<div class="comparison-list">'+state.options.map(comparisonCard).join('')+'</div>'+
     '<section class="criteria" aria-label="모든 추천안에서 지킨 조건"><h2>지킨 조건</h2><ul>'+kept.map(text=>'<li>'+icon('check')+'<span>'+text+'</span></li>').join('')+'</ul></section>'+
     '<div class="panel-links">'+link(icon('sliders')+'<span>조건 다시 조정하기</span>'+icon('chevron'),'preferences','row')+'</div>';
-  const week='<div class="week-card-head"><h2><span class="option-letter" aria-hidden="true">'+letter+'</span>'+esc(optionName(c))+'</h2><p class="fact-row"><span>'+icon('cap')+c.credits+'학점</span><span>'+icon('sun')+'첫 수업 '+timeText(earliest)+'</span></p></div>'+
+  const week='<div class="week-card-head"><h2><span class="option-letter" aria-hidden="true">'+letter+'</span>'+esc(optionName(c))+'</h2><p class="fact-row"><span>'+icon('book')+c.credits+'학점</span><span>'+icon('sun')+'첫 수업 '+timeText(earliest)+'</span></p></div>'+
     candidateTravelNotice(c.sections)+'<div class="week-preview timetable-surface"><div class="week-grid">'+timetable(c)+'</div></div>'+changesNotice(c)+
     '<div class="recommendation-reason"><p class="accent-text">'+flags.map(f=>'<span>'+icon('check')+f+'</span>').join('')+'</p>'+(c.metrics.lunchMissedDays?'<small>점심 1시간을 확보하지 못한 날이 '+c.metrics.lunchMissedDays+'일 있어요.</small>':'')+'</div>'+
     '<details class="disclosure"><summary>과목과 추천 이유</summary>'+(c.careerAssessment?'<p>희망 진로: '+esc(c.careerAssessment.goal)+'</p><small>'+esc(c.careerAssessment.notice)+'</small>':'')+'<p>'+esc(c.aiReason||'필수 조건을 지킨 유효 후보 중 서로 다른 시간표를 골랐어요.')+'</p>'+c.sections.map(s=>'<p>'+esc(s.name)+' · '+s.credits+'학점'+(c.careerAssessment?.evaluations.find(e=>e.courseId===s.courseId&&e.relevance!=='uncertain')?'<br>'+esc(c.careerAssessment.evaluations.find(e=>e.courseId===s.courseId).reason):'')+'</p>').join('')+'<p>'+esc(c.solverResult?.ranking_proven?'선택한 기준에서 우선순위를 확인한 결과예요.':'시간 안에 찾은 결과예요. 더 좋은 조합이 있을 수 있어요.')+'</p>'+'<p>적용 조건: '+applied.allowedDays.map(d=>dayNames[d]).join('·')+' / '+timeText(applied.earliestStart)+'–'+timeText(applied.latestEnd)+' / 총 '+applied.credits.total.min+'–'+applied.credits.total.max+'학점</p>'+(state.interpretation?.summary?'<p>'+esc(state.interpretation.summary)+'</p>':'')+(state.interpretation?.unsupported?.length?'<p>반영하지 못한 요청: '+state.interpretation.unsupported.map(esc).join(', ')+'</p>':'')+'<small>'+esc(state.catalogInfo.notice||'')+'</small></details>';
@@ -391,9 +391,9 @@ function savedView(){
   const rows=agenda.map(e=>'<li><button class="agenda-row" data-action="open-event" data-id="'+esc(e.id)+'"><span class="agenda-date '+(e.date===today?'today':'')+'">'+esc(relativeDay(e.date,today))+'</span><span><strong>'+esc(e.title)+'</strong><small>'+esc([e.source==='lms'?lmsTimeLabel(e):timeText(e.start),e.location].filter(Boolean).join(' · '))+'</small></span></button></li>').join('');
   return body('<div class="page-head"><div class="heading"><h1 tabindex="-1">'+(todayClasses?'오늘 수업 '+todayClasses+'개':weekday+'요일, 수업 없음')+'</h1><p>'+esc(calendarDateLabel(today))+' · '+semesterLabel()+'</p></div>'+
     '<div class="head-actions">'+link(icon('download')+'<span>내보내기</span>','export','secondary small')+link(icon('refresh')+'<span>다시 비교</span>',state.options.length?'results':'preferences','secondary small')+'</div></div>'+
-    '<div class="saved-layout"><div class="schedule-main"><section class="week-card" aria-label="이번 주 시간표"><div class="week-card-head"><h2>이번 주</h2><p class="fact-row"><span>'+icon('cap')+c.credits+'학점</span><span>'+icon('layers')+c.sections.length+'과목</span><span>'+icon('calendar')+'주 '+days+'일</span><span>'+icon('clock')+duration(weeklyMinutes)+'</span></p></div>'+grid+'</section></div>'+
+    '<div class="saved-layout"><div class="schedule-main"><section class="week-card" aria-label="이번 주 시간표"><div class="week-card-head"><h2>이번 주</h2><p class="fact-row"><span>'+icon('book')+c.credits+'학점</span><span>'+icon('layers')+c.sections.length+'과목</span><span>'+icon('calendar')+'주 '+days+'일</span><span>'+icon('clock')+duration(weeklyMinutes)+'</span></p></div>'+grid+'</section></div>'+
     '<aside class="saved-side">'+(todayRows?'<section class="agenda-card today-card"><h2>오늘</h2><ul class="agenda">'+todayRows+'</ul></section>':nextCard)+'<section class="agenda-card"><h2>다가오는 일정</h2>'+(rows?'<ul class="agenda">'+rows+'</ul>':'<p class="agenda-empty">'+icon('calendar')+'<span>일정 없음</span></p>')+'</section>'+
-    link(icon('calendar')+'<span>학기 캘린더</span>'+icon('chevron'),'calendar','row')+'</aside></div>','wide-body');
+    (state.user?'':link(icon('cap')+'<span>LMS 로그인</span>'+icon('chevron'),'login','row'))+link(icon('calendar')+'<span>학기 캘린더</span>'+icon('chevron'),'calendar','row')+'</aside></div>','wide-body');
 }
 
 function careerGroups(list,selectable=false){
@@ -438,7 +438,7 @@ function canAddEvent(date){
 const lmsShortcut=()=>state.user?'':'<a href="#login">'+icon('cap')+'<span>LMS 로그인</span>'+icon('chevron')+'</a>';
 function calendarSemesterLabel(){return semesterLabel()+(state.lmsCalendar?' · LMS '+state.lmsCalendar.events.length+'개':'')}
 function calendarView(){
-  return body('<div class="planner-page-heading"><div class="heading"><h1 tabindex="-1">학기 캘린더</h1><p id="calendar-semester-label">'+calendarSemesterLabel()+'</p></div><div class="head-actions">'+link(icon('cap')+'<span>LMS</span>','login','secondary','id="calendar-lms"')+link(icon('download'),'export','icon-button outlined','aria-label="내보내기"')+'</div></div>'+
+  return body('<div class="planner-page-heading"><div class="heading"><h1 tabindex="-1">학기 캘린더</h1><p id="calendar-semester-label">'+calendarSemesterLabel()+'</p></div><div class="head-actions">'+link(icon('cap')+'<span>'+(state.user?'LMS 연결됨':'LMS 로그인')+'</span>','login','secondary','id="calendar-lms"')+link(icon('download'),'export','icon-button outlined','aria-label="내보내기"')+'</div></div>'+
     '<section class="calendar-surface" aria-label="학기 일정 보기">'+
     '<div class="calendar-toolbar"><div class="calendar-mode" role="group" aria-label="캘린더 보기">'+
     Object.entries(calendarModes).map(([mode,label])=>button(label,'calendar-mode','quiet','data-value="'+mode+'" aria-pressed="'+(mode===state.calendarMode)+'"')).join('')+
@@ -494,7 +494,10 @@ function refreshCalendarEvents(){
 }
 function revealSelectedDay(){
   const scroll=$('calendar-grid-scroll'),cell=scroll?.querySelector('[data-calendar-header][data-calendar-selected]');
-  if(cell&&scroll.scrollWidth>scroll.clientWidth)scroll.scrollLeft+=cell.getBoundingClientRect().left-scroll.getBoundingClientRect().left-scroll.clientWidth/3;
+  if(!cell||scroll.scrollWidth<=scroll.clientWidth)return;
+  // The selected day starts right after the pinned hour column, so no column sits half under it.
+  const hours=scroll.querySelector('[data-calendar-header]').getBoundingClientRect().left-$('semester-calendar').getBoundingClientRect().left;
+  scroll.scrollLeft+=cell.getBoundingClientRect().left-scroll.getBoundingClientRect().left-hours;
 }
 function mountSemesterCalendar(){
   updateCalendarControls();
@@ -510,7 +513,8 @@ function mountSemesterCalendar(){
       if(canAddEvent(date))addEvent();
     }
   });
-  revealSelectedDay();
+  // The library sizes its hour column after the first paint, so follow the day columns until they settle.
+  requestAnimationFrame(()=>{const first=$('calendar-grid-scroll')?.querySelector('[data-calendar-header]');if(first)new ResizeObserver(revealSelectedDay).observe(first)});
 }
 function eventEditor(){
   const d=state.eventDraft,original=state.eventOriginal,cancelled=original?.status==='cancelled';
@@ -548,7 +552,7 @@ function exportView(){
     '<div class="export-card">'+icon('download')+'<h2>'+semesterLabel()+' 일정</h2><p>일정 '+active.length+'개, .ics 파일</p>'+(semester?'<small>'+semester.start+' ~ '+semester.end+'</small>':'')+'</div>'+
     info('변경한 일정까지 함께','휴강과 취소한 일정은 빼고, 시험과 개인 일정은 넣어요.',icon('calendar'))+
     '<ol class="export-help"><li>아래 버튼으로 일정 파일을 저장해요.</li><li>쓰는 캘린더에서 가져오기를 선택해요.</li><li>저장한 .ics 파일을 고르면 끝이에요.</li></ol><small>가져간 뒤의 변경은 자동으로 동기화되지 않아요.</small>','narrow')+
-    footer(active.length?button('캘린더 파일 다운로드','download'):link('LMS 일정 가져오기','calendar','primary'));
+    footer(active.length?button('캘린더 파일 다운로드','download'):link('LMS 일정 가져오기','login','primary'));
 }
 const exampleDefinitions=[
   {title:'전공의 기초를 단단하게',description:'자료구조와 알고리즘을 함께 살펴보는 조합',names:['자료구조','알고리즘'],color:'lime'},
@@ -596,7 +600,8 @@ function aiView(){
 }
 function userBar(){
   const name=state.user?.name||'';
-  return '<div class="account">'+(state.user?'<a class="avatar" href="#login" aria-label="계정'+(name?': '+esc(name):'')+'">'+(name?esc([...name][0]):icon('user'))+'</a>':link(icon('user'),'login','icon-button','aria-label="LMS 로그인"'))+'</div>';
+  return '<div class="account"><a class="account-link" href="#login" '+(state.route==='login'?'aria-current="page" ':'')+(state.user?'aria-label="계정'+(name?': '+esc(name):'')+'"':'')+'>'+
+    (state.user?'<span class="avatar">'+(name?esc([...name][0]):icon('user'))+'</span><span>계정</span>':icon('user')+'<span>로그인</span>')+'</a></div>';
 }
 // Signing up and signing in are the same act: logging in to the school LMS. The panel itself lives in index.html.
 function loginView(){

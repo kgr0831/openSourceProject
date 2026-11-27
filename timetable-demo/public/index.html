@@ -23,8 +23,8 @@
   <div id="lms-panel-host" hidden>
 <section id="lms-panel" class="lms-panel" aria-labelledby="lms-connection-title">
 <div class="lms-connect-row"><div class="lms-identity"><h2 id="lms-connection-title">숭실대 LMS로 시작하기</h2><span id="lms-badge" class="badge neutral" hidden></span><p id="lms-connection-description" class="subtle"></p></div>
+<div id="lms-login-help" class="lms-actions" hidden><button id="lms-focus" type="button" class="button primary">학교 로그인 창 보기</button><button id="lms-confirm" type="button" class="button secondary">로그인 완료했어요</button></div>
 <div class="lms-actions"><button id="lms-connect" type="button" class="button primary large" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 5l9 4.5-9 4.5z"/><path d="M7 12v4c1.5 1.4 3.2 2 5 2s3.5-.6 5-2v-4"/></svg><span id="lms-connect-label">LMS로 로그인</span></button><button id="lms-disconnect" type="button" class="button secondary" hidden>로그아웃</button></div></div>
-<div id="lms-login-help" class="lms-actions" hidden><button id="lms-focus" type="button" class="button secondary">학교 로그인 창 보기</button><button id="lms-confirm" type="button" class="button secondary">로그인 완료했어요</button></div>
 <p id="lms-message" class="message" role="status" aria-live="polite" hidden></p>
 <div id="lms-course-picker" hidden>
 <h3>캘린더에 넣을 과목</h3>
@@ -34,9 +34,9 @@
 <div class="lms-sync-row"><button id="lms-sync" type="button" class="button primary" disabled>일정 가져오기</button><button id="lms-cancel" type="button" class="button secondary" hidden>중단</button></div>
 </div>
 <div id="lms-progress" class="lms-progress" role="status" hidden><strong id="lms-progress-label">일정을 가져오고 있어요.</strong><progress id="lms-progress-bar" max="1" value="0" aria-label="일정 가져오기 진행률"></progress></div>
-<div id="lms-result" class="lms-result" hidden><div><strong id="lms-result-title"></strong><p id="lms-result-detail" class="subtle"></p></div><button id="lms-show-calendar" type="button" class="button secondary">캘린더에서 보기</button></div>
-<p id="lms-warnings" class="field-note" hidden></p>
-<p class="privacy-note">비밀번호는 학교 로그인 창에만 입력해요. 로그인 상태는 이 PC에 암호화해 보관해요.</p>
+<div id="lms-result" class="lms-result" hidden><div><strong id="lms-result-title"></strong><p id="lms-result-detail" class="subtle"></p></div><button id="lms-show-calendar" type="button" class="button primary">캘린더에서 보기</button></div>
+<p id="lms-warnings" class="message warn" hidden></p>
+<p class="privacy-note">비밀번호는 학교 로그인 창에만 입력해요. 로그인 상태는 이 기기에 암호화해 보관해요.</p>
 </section>
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

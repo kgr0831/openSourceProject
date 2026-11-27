@@ -95,7 +95,7 @@ export function setupLms(planner){
     $('lms-no-courses').hidden=visible.length>0;
     $('lms-selection-count').textContent=`${selected.size}개 선택`;
     $('lms-sync').disabled=locked()||!account||!selected.size;
-    $('lms-sync').textContent=cache?'일정 새로고침':'일정 가져오기';
+    $('lms-sync').textContent=cache?'일정 새로고침':'일정 가져오기';$('lms-sync').className='button '+(cache?'secondary':'primary');
     for(const id of ['lms-search','lms-term','lms-select-visible','lms-clear'])$(id).disabled=locked();
   }
 
@@ -103,16 +103,16 @@ export function setupLms(planner){
     const connection=state?.connection||'disconnected',pending=busyConnections.has(connection),connected=connection==='connected';
     const titles={restoring:'저장된 학교 로그인 확인 중',opening:'학교 로그인 창을 열고 있어요',waiting:'학교 창에서 로그인을 완료해 주세요',checking:'로그인 확인 중',loading:'내 수강 과목을 확인하고 있어요',background:'학교 연결을 백그라운드로 전환 중',disconnecting:'학교 연결을 해제하고 있어요',connected:state?.accountName||'LMS 계정',disconnected:'숭실대 LMS로 시작하기',error:'다시 로그인해 주세요'};
     $('lms-connection-title').textContent=state?.job?.reconnect?'학교 계정을 다시 연결해 주세요':titles[connection];
-    $('lms-connection-description').textContent=connected?(state.remembered?'이 PC에서 로그인이 유지돼요.':'앱을 다시 열면 로그인이 필요할 수 있어요.'):pending?'로그인이 끝나면 학교 창은 자동으로 닫혀요.':'학교 로그인 창에서 로그인하면 가입과 연결이 함께 끝나요.';
+    $('lms-connection-description').textContent=connected?(state.remembered?'이 기기에서 로그인이 유지돼요.':'앱을 다시 열면 로그인이 필요할 수 있어요.'):pending?'로그인이 끝나면 학교 창은 자동으로 닫혀요.':'처음이면 자동으로 가입돼요.';
     $('lms-badge').textContent=running()?'가져오는 중':pending?'연결 중':account?'연결됨':'';
-    $('lms-badge').className=account?'badge':'badge neutral';$('lms-badge').hidden=!$('lms-badge').textContent;
+    $('lms-badge').className='badge'+(account?'':' neutral')+(pending||running()?' busy':'');$('lms-badge').hidden=!$('lms-badge').textContent;
     $('lms-panel').classList.toggle('signed-in',Boolean(account));
     $('lms-connect').hidden=pending||connected&&!state?.job?.reconnect;
     $('lms-connect').disabled=acting||running()||pending;
     $('lms-connect-label').textContent=state?.job?.reconnect?'다시 로그인':'LMS로 로그인';
     $('lms-disconnect').hidden=!connected&&!pending;
     $('lms-disconnect').disabled=acting||running()||connection==='disconnecting';
-    $('lms-disconnect').textContent=pending?'취소':'로그아웃';
+    $('lms-disconnect').textContent=pending?'취소':'로그아웃';$('lms-disconnect').className='button '+(pending?'quiet':'secondary');
     $('lms-login-help').hidden=!['waiting','checking'].includes(connection);
     $('lms-confirm').disabled=acting||connection!=='waiting';$('lms-focus').disabled=acting;
     const message=localNotice||state?.notice||'';
@@ -133,7 +133,7 @@ export function setupLms(planner){
     }
     const warnings=account&&cache?.lastResultId===state?.result?.id?state?.result?.warnings||[]:[];
     $('lms-warnings').hidden=!warnings.length;
-    $('lms-warnings').textContent=`일부 정보를 확인하지 못한 항목이 ${warnings.length}개 있어요. 확인된 일정은 반영했고, 누락된 기존 일정은 보존했어요. 최종 마감은 LMS 원문에서도 확인해 주세요.`;
+    $('lms-warnings').textContent=`확인하지 못한 항목이 ${warnings.length}개 있어요. 마감은 LMS 원문에서도 확인해 주세요.`;
   }
 
   $('lms-connect').addEventListener('click',()=>act('connect'));
