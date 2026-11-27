@@ -1,0 +1,11 @@
+[Unit]
+Description=Collect SSU-PATH once daily at 03:00 Korea time
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Asia/Seoul
+Persistent=true
+AccuracySec=1min
+Unit=ssu-extracurricular.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,23 @@
+[Unit]
+Description=Collect public SSU-PATH extracurricular programs
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ssu-collector
+Group=ssu-collector
+# Change this path to the team's deployment checkout (readable by ssu-collector).
+WorkingDirectory=/opt/openSourceProject/extracurricular-collector
+ExecStart=/usr/bin/python3 -m ssu_collector --output /var/lib/ssu-extracurricular
+StateDirectory=ssu-extracurricular
+StateDirectoryMode=0750
+UMask=0027
+TimeoutStartSec=2h
+Environment=PYTHONUNBUFFERED=1
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+StandardOutput=journal
+StandardError=journal
