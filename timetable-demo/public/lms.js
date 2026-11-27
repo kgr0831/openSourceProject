@@ -21,6 +21,10 @@ export function setupLms(planner){
         const raw=localStorage.getItem(storageKey(account));
         if(raw){cache=restoreLmsCalendar(JSON.parse(raw),account);selected=new Set(cache.selectedCourseIds.filter(id=>state.courses.some(course=>course.id===id)))}
       }catch{localNotice='저장된 LMS 일정을 읽지 못했어요. 원래 기록은 보존했으니 과목을 선택해 다시 가져와 주세요.'}
+      if(!cache){
+        const latest=[...new Set(state.courses.map(course=>course.termId).filter(Boolean))].sort((a,b)=>Number(b)-Number(a))[0];
+        selected=new Set(state.courses.filter(course=>!latest||course.termId===latest).map(course=>course.id));
+      }
     }
     planner.setLmsCalendar(cache);
     planner.setLmsAccount(account?{key:account,name:state.accountName||''}:null);
