@@ -3,43 +3,43 @@ import {sectionLocation, timeText} from './planner-core.mjs';
 export const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // One stroke icon set, drawn on a 24px grid and coloured by the surrounding text.
 const iconPaths={
-  back:'<path d="M15 18l-6-6 6-6"/>',
-  plus:'<path d="M12 5v14M5 12h14"/>',
-  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
-  close:'<path d="M6 6l12 12M18 6 6 18"/>',
-  chevron:'<path d="m9 6 6 6-6 6"/>',
-  home:'<path d="M4 10.5 12 4l8 6.5V20H15v-6H9v6H4z"/>',
-  build:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 10v10"/>',
-  career:'<circle cx="12" cy="12" r="8"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
-  calendar:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
-  clock:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
-  download:'<path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 20h14"/>',
-  alert:'<path d="M12 4 3 20h18z"/><path d="M12 10v4M12 17v.5"/>',
-  search:'<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>',
-  user:'<circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>',
-  spark:'<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
-  book:'<path d="M5 4.5h9a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h9"/>',
-  arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',
-  minus:'<path d="M5 12h14"/>',
-  down:'<path d="m6 9 6 6 6-6"/>',
-  sliders:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
-  info:'<circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8v.5"/>',
-  sun:'<circle cx="12" cy="12" r="3.5"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>',
-  moon:'<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/>',
-  lunch:'<path d="M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z"/><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M12 3v3"/>',
-  compact:'<path d="M12 3v6M9 6l3 3 3-3M12 21v-6M9 18l3-3 3 3M5 12h14"/>',
-  pencil:'<path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19z"/><path d="m14.5 6.5 3 3"/>',
-  bookmark:'<path d="M7 4h10v16l-5-3.5L7 20z"/>',
-  pin:'<path d="M12 21s6-5.4 6-10.5a6 6 0 0 0-12 0C6 15.6 12 21 12 21z"/><circle cx="12" cy="10.5" r="2"/>',
-  cap:'<path d="M3 9.5 12 5l9 4.5-9 4.5z"/><path d="M7 12v4c1.5 1.3 3.2 2 5 2s3.5-.7 5-2v-4"/>',
-  layers:'<path d="m12 4 8 4-8 4-8-4z"/><path d="m4 12 8 4 8-4M4 16l8 4 8-4"/>',
-  chat:'<path d="M5 6h14v10H10l-4 3.5V16H5z"/>',
-  logout:'<path d="M10 5H5v14h5M15 8l4 4-4 4M9 12h10"/>',
-  refresh:'<path d="M19 12a7 7 0 1 1-2.2-5.1M19 5v4h-4"/>',
-  award:'<circle cx="12" cy="9" r="5"/><path d="m9 13.5-1.5 6.5 4.5-2.5 4.5 2.5-1.5-6.5"/>',
-  walk:'<circle cx="13" cy="5" r="1.6"/><path d="m9 21 2.5-6-2-2.5L11 8l3 2.5 3 1M11.5 15l3 2.5V21M9.5 10.5 8 13"/>'
+  back:'<path d="M14.5 6.5 9 12l5.5 5.5"/>',
+  plus:'<path d="M12 5.5v13M5.5 12h13"/>',
+  minus:'<path d="M5.5 12h13"/>',
+  check:'<path d="m5.5 12.5 4.2 4.2 8.8-9.2"/>',
+  close:'<path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/>',
+  chevron:'<path d="m9.5 6.5 5.5 5.5-5.5 5.5"/>',
+  down:'<path d="m6.5 9.5 5.5 5.5 5.5-5.5"/>',
+  arrow:'<path d="M5 12h14M13.5 6.5 19 12l-5.5 5.5"/>',
+  home:'<path d="M4.5 11 11 5.3a1.6 1.6 0 0 1 2 0L19.5 11v6.5A2.5 2.5 0 0 1 17 20h-2.2v-4a1.8 1.8 0 0 0-1.8-1.8h-2A1.8 1.8 0 0 0 9.2 16v4H7a2.5 2.5 0 0 1-2.5-2.5z"/>',
+  build:'<rect x="4" y="4" width="16" height="16" rx="5"/><path d="M4 10h16M10 10v10"/>',
+  career:'<circle cx="12" cy="12" r="8.5"/><path d="m15.4 8.6-1.8 5-5 1.8 1.8-5z"/>',
+  calendar:'<rect x="4" y="5.5" width="16" height="14.5" rx="4.5"/><path d="M4 10.5h16M8.5 3.5V7M15.5 3.5V7"/>',
+  clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  download:'<path d="M12 4.5v10M7.5 10.5 12 15l4.5-4.5M5.5 19.5h13"/>',
+  alert:'<path d="M10.3 5.2 3.6 17a2 2 0 0 0 1.7 3h13.4a2 2 0 0 0 1.7-3L13.7 5.2a2 2 0 0 0-3.4 0z"/><path d="M12 10v4M12 17v.2"/>',
+  search:'<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>',
+  user:'<circle cx="12" cy="8.5" r="4"/><path d="M4.5 20c.6-3.6 3.6-5.5 7.5-5.5s6.9 1.9 7.5 5.5"/>',
+  spark:'<path d="M12 4c.6 4.4 3.6 7.4 8 8-4.4.6-7.4 3.6-8 8-.6-4.4-3.6-7.4-8-8 4.4-.6 7.4-3.6 8-8z"/>',
+  book:'<path d="M5 6.5A2.5 2.5 0 0 1 7.5 4H19v13H7.5A2.5 2.5 0 0 0 5 19.5z"/><path d="M5 19.5A2.5 2.5 0 0 0 7.5 22H19"/>',
+  sliders:'<path d="M4.5 7.5h8M17.5 7.5h2M4.5 16.5h2M11.5 16.5h8"/><circle cx="15" cy="7.5" r="2.5"/><circle cx="9" cy="16.5" r="2.5"/>',
+  info:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 7.8v.2"/>',
+  sun:'<circle cx="12" cy="12" r="3.8"/><path d="M12 3.5v1.5M12 19v1.5M3.5 12H5M19 12h1.5M6 6l1 1M17 17l1 1M6 18l1-1M17 7l1-1"/>',
+  moon:'<path d="M19.5 14.2A8 8 0 0 1 9.8 4.5a8 8 0 1 0 9.7 9.7z"/>',
+  lunch:'<path d="M5 9.5h11v4.5a4.5 4.5 0 0 1-4.5 4.5h-2A4.5 4.5 0 0 1 5 14z"/><path d="M16 10.5h1a2.5 2.5 0 0 1 0 5h-1M8.5 3.5v3M12.5 3.5v3"/>',
+  compact:'<path d="M12 3.5v5.5M9 6.5l3 3 3-3M12 20.5V15M9 17.5l3-3 3 3M5 12h14"/>',
+  pencil:'<path d="M4.5 19.5l.9-4L16.2 4.7a2.1 2.1 0 0 1 3 3L8.5 18.6z"/><path d="m14.5 6.5 3 3"/>',
+  bookmark:'<path d="M7 6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-3.5L7 20z"/>',
+  pin:'<path d="M12 20.5s6.5-5.3 6.5-10.3a6.5 6.5 0 0 0-13 0c0 5 6.5 10.3 6.5 10.3z"/><circle cx="12" cy="10.2" r="2.3"/>',
+  cap:'<path d="M3 9.5 12 5l9 4.5-9 4.5z"/><path d="M7 12v4c1.5 1.4 3.2 2 5 2s3.5-.6 5-2v-4"/>',
+  layers:'<path d="m12 4.5 8 4-8 4-8-4z"/><path d="m4 12.5 8 4 8-4M4 16.5l8 4 8-4"/>',
+  chat:'<path d="M7 5h10a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3h-5.5L7 19.5V16a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z"/>',
+  logout:'<path d="M10 4.5H7.5a2.5 2.5 0 0 0-2.5 2.5v10a2.5 2.5 0 0 0 2.5 2.5H10M15 8l4 4-4 4M9.5 12H19"/>',
+  refresh:'<path d="M19.5 12a7.5 7.5 0 1 1-2.4-5.5M19.5 4.5v4.3h-4.3"/>',
+  award:'<circle cx="12" cy="9.5" r="5.5"/><path d="m8.8 14-1.3 6 4.5-2.5 4.5 2.5-1.3-6"/>',
+  walk:'<circle cx="13" cy="5" r="1.8"/><path d="m9 21 2.5-6-2-2.5L11 8l3 2.5 3 1M11.5 15l3 2.5V21M9.5 10.5 8 13"/>'
 };
-export const icon=name=>`<svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${iconPaths[name]}</svg>`;
+export const icon=name=>`<svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${iconPaths[name]}</svg>`;
 export const button=(label,action,variant='primary',attrs='')=>`<button type="button" class="button ${variant}" data-action="${action}" ${attrs}>${label}</button>`;
 export const link=(label,route,variant='quiet',attrs='')=>`<a class="button ${variant}" href="#${route}" ${attrs}>${label}</a>`;
 export const heading=(title,description='')=>`<div class="heading"><h1 tabindex="-1">${title}</h1>${description?`<p>${description}</p>`:''}</div>`;
@@ -49,8 +49,8 @@ export const toggle=(key,label,checked,description='')=>`<label class="toggle"><
 export const tabs=(items,active,action)=>`<div class="tabs" role="group" data-tabs="${action}">${items.map(([id,label])=>button(esc(label),action,'tab',`data-value="${esc(id)}" aria-pressed="${String(id)===String(active)}"`)).join('')}<span class="tab-indicator" aria-hidden="true"></span></div>`;
 export const footer=(content,hint='')=>`<footer class="action-footer">${hint?`<p>${hint}</p>`:''}${content}</footer>`;
 export const dayNames=['월','화','수','목','금','토','일'];
-const colors=['blue','peach','sage','lavender','rose','teal','olive','slate'];
-const sampleColors={ds:'sage',algo:'lavender',db:'blue',media:'olive',bible:'peach'};
+const colors=['sky','peach','lime','lavender','pink','yellow','cocoa','slate'];
+const sampleColors={ds:'lime',algo:'lavender',db:'sky',media:'yellow',bible:'pink'};
 const colorKey='ssu-timetable-course-colors',colorStore=globalThis.localStorage;
 let colorOrder=[];
 try{colorOrder=JSON.parse(colorStore?.getItem(colorKey))||[]}catch{}
@@ -100,9 +100,9 @@ export function timetable(candidate,action='section',{fullDetails=false,window=n
 export function layoutTimetables(){
   document.querySelectorAll('.timetable').forEach(el=>{el.style.setProperty('--hours',el.dataset.hours);el.style.setProperty('--days',el.dataset.days||5)});
   document.querySelectorAll('[data-offset]').forEach(el=>el.style.top=el.dataset.offset+'%');
-  document.querySelectorAll('[data-length]').forEach(el=>el.style.height=el.dataset.length+'%');
+  document.querySelectorAll('.class-block[data-length]').forEach(el=>el.style.height=`calc(${el.dataset.length}% - 3px)`);
   document.querySelectorAll('[data-span]').forEach(el=>el.style.height=el.dataset.span+'%');
-  document.querySelectorAll('[data-lanes]').forEach(el=>Object.assign(el.style,{left:el.dataset.lane/el.dataset.lanes*100+'%',right:'auto',width:100/el.dataset.lanes+'%'}));
+  document.querySelectorAll('[data-lanes]').forEach(el=>Object.assign(el.style,{left:`calc(${el.dataset.lane/el.dataset.lanes*100}% + 2px)`,right:'auto',width:`calc(${100/el.dataset.lanes}% - 4px)`}));
 }
 // A week drawn small: course rows and candidate cards show when a class meets instead of saying it.
 export function miniWeek(sections,{days=5,from=540,to=1080,label=''}={}){

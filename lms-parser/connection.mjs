@@ -15,7 +15,7 @@ export class LmsConnection {
       receiveCookies: session.receiveCookies, refreshAuth: session.ensureLogin, learningxAuth: session.learningxAuth, signal}));
     this.loginInterval = loginInterval;
     this.session = null; this.generation = 0; this.resultDirectory = null;
-    this.state = {revision: 0, instanceId: randomUUID(), accountKey: null, demo, connection: 'disconnected', remembered: false, courses: [], notice: null, job: null, result: null};
+    this.state = {revision: 0, instanceId: randomUUID(), accountKey: null, accountName: null, demo, connection: 'disconnected', remembered: false, courses: [], notice: null, job: null, result: null};
   }
 
   update(patch) { Object.assign(this.state, patch); this.state.revision++; }
@@ -30,7 +30,7 @@ export class LmsConnection {
     this.loginController?.abort(); this.loginController = new AbortController();
     const previous = this.session; this.session = null;
     this.resultDirectory = null;
-    this.update({connection: 'restoring', accountKey: null, courses: [], notice: null, job: null, result: null});
+    this.update({connection: 'restoring', accountKey: null, accountName: null, courses: [], notice: null, job: null, result: null});
     this.loginTask = this.runConnection(generation, previous, this.loginController, interactive);
   }
 
@@ -91,7 +91,7 @@ export class LmsConnection {
     if (!courses.length) throw new LmsError('NO_COURSES', 'empty');
     await session.save?.();
     if (generation !== this.generation) return;
-    this.update({connection: 'connected', accountKey: stableId(client.canvas, String(user.id)), remembered: Boolean(session.remembered), courses,
+    this.update({connection: 'connected', accountKey: stableId(client.canvas, String(user.id)), accountName: cleanText(user.name || user.short_name || '') || null, remembered: Boolean(session.remembered), courses,
       notice: session.storageWarning ? friendlyError({code: 'SESSION_STORAGE'}) : warnings.length ? '학교 화면에서 과목을 확인했어요. 일부 상세 자료는 가져오지 못할 수 있어요.' : null});
   }
 
@@ -117,7 +117,7 @@ export class LmsConnection {
     ++this.generation; this.loginController?.abort();
     const session = this.session; this.session = null;
     this.resultDirectory = null;
-    this.update({connection: 'disconnecting', accountKey: null, courses: [], notice: null, job: null, result: null});
+    this.update({connection: 'disconnecting', accountKey: null, accountName: null, courses: [], notice: null, job: null, result: null});
     await session?.close().catch(() => {});
     try { if (forget) await this.sessionStore?.clear(); }
     catch { this.update({connection: 'error', remembered: true, notice: '저장된 로그인을 지우지 못했어요. 다시 시도해 주세요.'}); return; }

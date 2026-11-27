@@ -3,9 +3,25 @@ import {calendarTimeZone, calendarViews, koreanDate} from './calendar-display.mj
 import {timeValue} from './planner-core.mjs';
 
 export function highlightCalendarDate(element, date) {
-  for (const cell of element.querySelectorAll('[data-calendar-day], [data-calendar-header]')) {
-    cell.toggleAttribute('data-calendar-selected', (cell.dataset.calendarDay || cell.dataset.calendarHeader) === date);
+  for (const cell of element.querySelectorAll('[data-calendar-day], [data-calendar-header], [data-calendar-lane]')) {
+    cell.toggleAttribute('data-calendar-selected', (cell.dataset.calendarDay || cell.dataset.calendarHeader || cell.dataset.calendarLane) === date);
   }
+}
+
+// ponytail: the library has no hook for the hour column, so its cells are found by their text and by sitting in a
+// three-part row (axis, days, scrollbar gap). If a library update changes that shape the labels simply scroll away again.
+function markAxis(element) {
+  for (const leaf of element.querySelectorAll('div')) {
+    if (leaf.children.length || !/^(\d\d:00|종일)$/.test(leaf.textContent.trim())) continue;
+    let cell = leaf;
+    while (cell.parentElement && cell.parentElement !== element && cell.parentElement.children.length !== 3) cell = cell.parentElement;
+    if (!cell.parentElement || cell.parentElement === element) continue;
+    cell.dataset.calendarAxis = '';
+    // Half-hour rows carry no label; their first cell belongs to the same column.
+    if (leaf.textContent.trim() !== '종일') for (const row of cell.parentElement.parentElement.children) if (row.children.length === 3) row.firstElementChild.dataset.calendarAxis = '';
+  }
+  const headerRow = element.querySelector('[data-calendar-header]')?.parentElement?.parentElement;
+  if (headerRow?.children.length === 3) headerRow.firstElementChild.dataset.calendarAxis = '';
 }
 
 function eventContent({event, timeText, view}) {
@@ -21,9 +37,8 @@ function eventContent({event, timeText, view}) {
   }
   add('span', 'calendar-event-kind', label);
   add('strong', 'calendar-event-title', event.title);
-  if (view.type !== calendarViews.day) {
-    add('span', 'calendar-event-time', event.allDay || point ? time : timeText || time);
-  }
+  // The daily list has no time column of its own, so each row carries its time.
+  add('span', 'calendar-event-time', view.type === calendarViews.day || event.allDay || point ? time : timeText || time);
   add('span', 'calendar-event-location', location);
   return {domNodes: [element]};
 }
@@ -51,7 +66,7 @@ export function mountCalendar(element, {mode, date, selectedDate, weekBounds, ev
       return calendarViews.day;
     },
     events(_range, success) { success(events()); },
-    datesSet() { highlightCalendarDate(element, selectedDate()); },
+    datesSet() { highlightCalendarDate(element, selectedDate()); markAxis(element); },
     navLinkDayClick(day) { onDay(koreanDate(day)); },
     dateClick(info) {
       if (info.allDay) onDay(info.dateStr.slice(0, 10));
@@ -87,8 +102,12 @@ export function mountCalendar(element, {mode, date, selectedDate, weekBounds, ev
       el.dataset.calendarHeader = koreanDate(date);
       el.toggleAttribute('data-calendar-selected', el.dataset.calendarHeader === selectedDate());
     },
-    dayLaneDidMount({el, date}) { el.dataset.calendarLane = koreanDate(date); }
+    dayLaneDidMount({el, date}) {
+      el.dataset.calendarLane = koreanDate(date);
+      el.toggleAttribute('data-calendar-selected', el.dataset.calendarLane === selectedDate());
+    }
   });
   calendar.render();
+  markAxis(element);
   return calendar;
 }

@@ -18,7 +18,7 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
     completeLogin:async()=>{loggedIn=true},useInBackground:async()=>{},save:async()=>{},close:async()=>{},remembered:true,
   }),createClient:(_,signal)=>new HttpClient({signal,fetchImpl:async(url,options)=>{
     const parsed=new URL(url);
-    if(parsed.pathname==='/api/v1/users/self')return Response.json({id:currentUser});
+    if(parsed.pathname==='/api/v1/users/self')return Response.json({id:currentUser,name:'김숭실'});
     if(parsed.pathname==='/api/v1/courses')return Response.json([
       {id:10,name:'기초설계',course_code:'DESIGN',term:{id:3,name:'2026-2'}},
       {id:20,name:'자료구조',course_code:'DATA',term:{id:3,name:'2026-2'}},
@@ -37,16 +37,19 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
   let page=await context.newPage();page.on('pageerror',error=>failures.push(error.message));
   await page.emulateMedia({reducedMotion:'reduce'});
   const base=`http://127.0.0.1:${server.address().port}`;
-  await page.goto(base+'/#calendar');
-  await page.locator('#lms-connect:not([disabled])').waitFor();await page.locator('#lms-connect').click();
+  await page.goto(base+'/#signup');await page.locator('main[data-route="start"]').waitFor();
+  assert.equal(await page.locator('.sidebar .avatar').count(),0);
+  await page.locator('.shortcut-list a[href="#login"]').click();
+  await page.locator('#lms-connect:not([disabled])').waitFor();assert.equal(await page.locator('#content input[type="password"]').count(),0);await page.locator('#lms-connect').click();
   await page.locator('#lms-confirm').click();
   await page.locator('#lms-course-picker').waitFor({state:'visible'});
+  assert.equal(await page.locator('.sidebar .avatar').innerText(),'김');assert.equal(await page.locator('#lms-connection-title').innerText(),'김숭실');
   assert.equal(await page.locator('#lms-courses input:checked').count(),0);
   assert.equal(await page.locator('#lms-sync').isDisabled(),true);
   await page.locator('#lms-search').fill('기초');assert.equal(await page.locator('#lms-courses label').count(),1);
   await page.locator('#lms-courses input[value="10"]').check();await page.locator('#lms-sync').click();
   await page.waitForFunction(()=>document.querySelector('#lms-result-title').textContent.includes('3개'));
-  assert.deepEqual(app.state.job.courseIds,['10']);assert.equal(await page.locator('#calendar-date').isVisible(),true);
+  assert.deepEqual(app.state.job.courseIds,['10']);await page.locator('#lms-show-calendar').click();await page.locator('#calendar-date').waitFor();
   await page.locator('#calendar-date').fill('2026-11-10');
   await page.locator('[data-action="calendar-mode"][data-value="day"]').click();
   const deadline=page.locator('[data-calendar-event][aria-label*="개인 마감"]');
@@ -58,10 +61,10 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
   const downloadPromise=page.waitForEvent('download');await page.locator('[data-action="download"]').click();
   const download=await downloadPromise,ics=await readFile(await download.path(),'utf8');
   assert.equal((ics.match(/BEGIN:VEVENT/g)||[]).length,3);assert.match(ics,/DTSTART:20261110T145900Z/);
-  await page.evaluate(()=>location.hash='calendar');await page.locator('#lms-sync').waitFor({state:'visible'});
+  await page.evaluate(()=>location.hash='login');await page.locator('#lms-sync').waitFor({state:'visible'});
   dueAt='2026-11-12T12:00:00Z';await page.locator('#lms-sync').click();
   await page.waitForFunction(()=>document.querySelector('#lms-result-detail').textContent.includes('변경 1개'));
-  assert.equal(await page.locator('#lms-result-title').innerText(),'LMS 일정 3개가 캘린더에 있어요.');
+  assert.equal(await page.locator('#lms-result-title').innerText(),'LMS 일정 3개');
   await page.reload();await page.locator('#lms-result').waitFor({state:'visible'});
   assert.equal(await page.locator('#lms-courses input:checked').count(),1);
   // Existing timetable recommendation remains usable and LMS records survive a semester save.
@@ -73,10 +76,10 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
   assert.match(await page.locator('#content .heading p').first().innerText(),/LMS 3개/);
   const manualCount=await page.evaluate(()=>JSON.parse(localStorage.getItem('ssu-timetable-planner-v1')).events.length);assert.ok(manualCount>0);
   // Closing the page does not stop the server's collection; reopening imports its result once.
-  gated=true;await page.locator('#lms-sync').click();
+  await page.locator('#calendar-lms').click();gated=true;await page.locator('#lms-sync').click();
   await page.waitForFunction(()=>!document.querySelector('#lms-progress').hidden);await page.close();
   assert.ok(release);release();await app.jobTask;gated=false;
-  page=await context.newPage();page.on('pageerror',error=>failures.push(error.message));await page.goto(base+'/#calendar');
+  page=await context.newPage();page.on('pageerror',error=>failures.push(error.message));await page.goto(base+'/#login');
   await page.locator('#lms-result').waitFor({state:'visible'});
   assert.match(await page.locator('#lms-result-title').innerText(),/3개/);
   const screenshotRoot=fileURLToPath(new URL('../.ui-qa/',import.meta.url));await mkdir(screenshotRoot,{recursive:true});
@@ -84,9 +87,11 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:screenshotRoot+'lms-calendar-mobile.png',fullPage:true});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await page.locator('#lms-disconnect').click();await page.locator('#lms-result').waitFor({state:'hidden'});
+  assert.equal(await page.locator('.sidebar .avatar').count(),0);
+  await page.evaluate(()=>location.hash='calendar');await page.locator('#calendar-date').waitFor();
   assert.doesNotMatch(await page.locator('#content .heading p').first().innerText(),/LMS 3개/);
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ssu-timetable-planner-v1')).events.length),manualCount);
-  currentUser=100;loggedIn=false;await page.locator('#lms-connect').click();await page.locator('#lms-confirm').click();
+  await page.evaluate(()=>location.hash='login');currentUser=100;loggedIn=false;await page.locator('#lms-connect').click();await page.locator('#lms-confirm').click();
   await page.locator('#lms-course-picker').waitFor({state:'visible'});
   assert.equal(await page.locator('#lms-result').isVisible(),false);assert.equal(await page.locator('#lms-courses input:checked').count(),0);
   assert.deepEqual(failures,[]);

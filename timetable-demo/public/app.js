@@ -15,14 +15,13 @@ import {evaluateCourseTimes} from './course-times.mjs';
 import {courseFilterControls,selectedCourseTimes} from './course-flow-ui.js';
 import {courseFilterOptions,matchesCourseFilters} from './course-filters.mjs';
 import {courseCreditPlan,defaultCreditRanges,selectedCredits} from './course-credits.mjs';
-import * as auth from './auth.js';
 
 const $=id=>document.getElementById(id);
 const emptyCourseFilters=()=>({completion:[],credits:[],years:[]});
 const store=createPlannerStore({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)});
 const programStore=createProgramStore({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value),removeItem:key=>localStorage.removeItem(key)});
 const state={
-  user:auth.getCachedUser(),
+  user:null,
   courses:[],catalogInfo:{},catalogBusy:false,request:null,options:[],active:0,query:'',kind:'major',showAll:false,route:'start',
   courseFilters:emptyCourseFilters(),creditChoice:{mode:'auto'},creditFeedback:{},
   careerGoal:store.data.careerRecommendations?.goal||'',careerBusy:false,selectedDate:koreanToday(),selectedMinute:null,
@@ -34,7 +33,7 @@ let toastTimer,pollTimer,requestVersion=0,lmsReady=false,pendingCalendar=null,ca
 let courseTimeCheck=null;
 const allEvents=()=>[...calendarEvents(store.data.events),...(state.lmsCalendar?.events||[])];
 const calendarOptions=()=>({externalEvents:state.lmsCalendar?.events||[]});
-const titles={start:'캠퍼스 시간표',courses:'과목 담기',preferences:'생활 패턴',advanced:'세부 조건',results:'추천 비교',saved:'내 시간표',career:'희망진로 검색','career-list':'진로 추천 과목',programs:'비교과 프로그램',calendar:'학기 캘린더',export:'캘린더 내보내기',experience:'수강 경험',record:'나의 수강 기록',empty:'추천 결과',loading:'시간표 찾는 중',error:'연결 확인',ai:'AI에게 요청하기',login:'로그인',signup:'회원가입'};
+const titles={start:'캠퍼스 시간표',courses:'과목 담기',preferences:'생활 패턴',advanced:'세부 조건',results:'추천 비교',saved:'내 시간표',career:'희망진로 검색','career-list':'진로 추천 과목',programs:'비교과 프로그램',calendar:'학기 캘린더',export:'캘린더 내보내기',experience:'수강 경험',record:'나의 수강 기록',empty:'추천 결과',loading:'시간표 찾는 중',error:'연결 확인',ai:'AI에게 요청하기',login:'계정'};
 // The same four destinations appear as the desktop top bar and the mobile tab bar.
 const navGroups=[
   ['home','홈','home',['start','saved']],
@@ -43,7 +42,7 @@ const navGroups=[
   ['calendar','캘린더','calendar',['calendar','export']]
 ];
 // Destinations reached from the main navigation; on desktop they need no back bar.
-const topLevelRoutes=new Set(['start','saved','calendar','career','career-list','programs','login','signup']);
+const topLevelRoutes=new Set(['start','saved','calendar','career','career-list','programs','login']);
 const tabRoutes=new Set(['start','saved','career','career-list','programs','calendar','export','experience','record']);
 function navHref(key){
   if(key==='home')return store.data.semester?'saved':'start';
@@ -79,7 +78,7 @@ async function changeCatalog(scope){
 function semesterLabel(){const start=store.data.semester?.start||koreanToday();return start.slice(0,4)+'년 '+(Number(start.slice(5,7))<=6?'1':'2')+'학기'}
 function flash(text,error=false){clearTimeout(toastTimer);$('toast').textContent=text;$('toast').className='toast'+(error?' error':'');$('toast').hidden=false;toastTimer=setTimeout(()=>$('toast').hidden=true,5500)}
 function go(route){if(location.hash==='#'+route){state.route=route;render()}else location.hash=route}
-function back(){go(({courses:'start',preferences:'courses',advanced:'preferences',results:'preferences',career:'start','career-list':'career',programs:'start',calendar:'saved',experience:'career',record:'experience',export:'calendar',ai:'preferences',empty:'preferences',loading:'preferences',error:'preferences',login:'start',signup:'start'})[state.route]||'saved')}
+function back(){go(({courses:'start',preferences:'courses',advanced:'preferences',results:'preferences',career:'start','career-list':'career',programs:'start',calendar:'saved',experience:'career',record:'experience',export:'calendar',ai:'preferences',empty:'preferences',loading:'preferences',error:'preferences',login:'start'})[state.route]||'saved')}
 async function api(route,body,signal){
   const r=await fetch('/api/'+route,{...(body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-Timetable-App':'1'},body:JSON.stringify(body)}),signal:signal||AbortSignal.timeout(20000)});
   const data=await r.json();if(!r.ok)throw new Error(data.error||'잠시 뒤 다시 시도해 주세요.');return data;
@@ -98,11 +97,11 @@ function renderHeader(){
   const route=state.route,step=({courses:1,preferences:2,advanced:2,loading:3,results:3})[route];
   const backButton=!['start','saved','career','career-list','programs','calendar'].includes(route)?button(icon('back'),'back','icon-button','aria-label="이전 화면"'):'';
   const extra=step?'<span class="step-label">'+step+' / 3</span>':
-    route==='saved'?link(icon('pencil'),state.options.length?'results':'preferences','icon-button','aria-label="추천안 다시 비교"')+link(icon('download'),'export','icon-button','aria-label="캘린더 파일 내보내기"')+button(icon('plus'),'new','icon-button','aria-label="새 시간표 만들기"'):
-    ['start','career','career-list','programs','calendar'].includes(route)?link(icon('user'),'login','icon-button','aria-label="'+(state.user?'계정':'로그인')+'"'):'';
-  return '<header class="mobile-header'+(step?' flow-header':'')+'">'+backButton+'<span class="page-name">'+titles[route]+'</span>'+(step?flowProgress():'')+extra+'</header>';
+    route==='saved'?link(icon('refresh'),state.options.length?'results':'preferences','icon-button','aria-label="추천안 다시 비교"')+link(icon('download'),'export','icon-button','aria-label="캘린더 파일 내보내기"')+button(icon('plus'),'new','icon-button','aria-label="새 시간표 만들기"')+link(icon('user'),'login','icon-button','aria-label="'+(state.user?'계정':'LMS 로그인')+'"'):
+    ['start','career','career-list','programs','calendar'].includes(route)?link(icon('user'),'login','icon-button','aria-label="'+(state.user?'계정':'LMS 로그인')+'"'):'';
+  return '<header class="mobile-header'+(step?' flow-header':'')+'">'+backButton+'<span class="page-name">'+(route==='start'?brandMark:'')+titles[route]+'</span>'+(step?flowProgress():'')+extra+'</header>';
 }
-const brandMark='<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="9" fill="#17181c"/><rect x="7" y="8" width="5" height="9" rx="1.5" fill="#ff6b57"/><rect x="13.5" y="12" width="5" height="12" rx="1.5" fill="#4d8dff"/><rect x="20" y="8" width="5" height="6" rx="1.5" fill="#35c486"/><rect x="20" y="16" width="5" height="8" rx="1.5" fill="#ffc53d"/></svg>';
+const brandMark='<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="10.5" fill="#20c5a0"/><rect x="6.5" y="7.5" width="5.5" height="10" rx="2" fill="#06231c"/><rect x="13.25" y="12" width="5.5" height="12.5" rx="2" fill="#fff"/><rect x="20" y="7.5" width="5.5" height="6" rx="2" fill="#06231c"/><rect x="20" y="15" width="5.5" height="9.5" rx="2" fill="#06231c"/></svg>';
 // PC navigation is a slim rail: the mark, four destinations, the account.
 function sidebar(){
   return '<aside class="sidebar"><a class="brand" href="#'+navHref('home')+'" aria-label="캠퍼스 시간표 홈">'+brandMark+'</a>'+
@@ -126,7 +125,7 @@ function startView(){
   return body(heading(esc(termLabel(r?.term)||'시간표'),esc(r?.department||''))+
     '<div class="welcome-action">'+link(icon('plus')+'<span>시간표 만들기</span>','courses','primary large')+link(icon('career')+'<span>진로로 찾기</span>','career','secondary large')+'</div>'+
     '<section class="start-week week-card" aria-label="예시 시간표" inert><span class="chip">예시</span><div class="week-grid">'+timetable(sampleWeek,'none')+'</div></section>'+
-    '<nav class="shortcut-list" aria-label="바로가기"><a href="#programs">'+icon('award')+'<span>비교과 프로그램</span>'+icon('chevron')+'</a></nav>','start-body');
+    '<nav class="shortcut-list" aria-label="바로가기">'+lmsShortcut()+'<a href="#programs">'+icon('award')+'<span>비교과 프로그램</span>'+icon('chevron')+'</a></nav>','start-body');
 }
 const dayList=meetings=>[...new Set(meetings.map(m=>m[0]))].sort().map(d=>dayNames[d]).join('·');
 function courseList(){
@@ -219,7 +218,7 @@ function builderActions(action){
 }
 function liveWeek(){
   const {total}=selectedCredits(state.courses,state.request.requiredCourseIds);
-  return '<div class="week-card-head"><h2>내 한 주</h2><div class="credit-meter">'+icon('cap')+'<strong id="credit-meter-label">'+creditMeterLabel(total)+'</strong></div></div>'+
+  return '<div class="week-card-head"><h2>내 한 주</h2><div class="credit-meter">'+icon('book')+'<strong id="credit-meter-label">'+creditMeterLabel(total)+'</strong></div></div>'+
     '<div id="week-preview" class="week-preview">'+weekPreview()+'</div>';
 }
 // Sections come from the compatibility check when it has answered, and from the catalog until then, so a picked course shows at once.
@@ -313,7 +312,7 @@ function preferencesView(){
     ? '<section class="selected-course-times" aria-labelledby="course-times-heading"><h2 id="course-times-heading">분반 시간</h2><div id="selected-course-times"></div></section>' : '';
   return body(workspace(heading('원하는 한 주')+
     '<div class="pref-list">'+
-    prefRow('cap','<label for="target-credits">목표 학점</label>','<div class="credit-target">'+button(icon('minus'),'credit-step','stepper','data-value="-1" aria-label="학점 줄이기"')+'<input aria-describedby="credit-ranges-summary credit-check" id="target-credits" type="number" step="0.5" min="0.5" max="24" value="'+creditValue(goal)+'">'+button(icon('plus'),'credit-step','stepper','data-value="1" aria-label="학점 늘리기"')+'<span id="credit-ranges-summary">'+creditRangesSummary()+'</span></div>'+creditFeedback())+
+    prefRow('book','<label for="target-credits">목표 학점</label>','<div class="credit-target">'+button(icon('minus'),'credit-step','stepper','data-value="-1" aria-label="학점 줄이기"')+'<input aria-describedby="credit-ranges-summary credit-check" id="target-credits" type="number" step="0.5" min="0.5" max="24" value="'+creditValue(goal)+'">'+button(icon('plus'),'credit-step','stepper','data-value="1" aria-label="학점 늘리기"')+'<span id="credit-ranges-summary">'+creditRangesSummary()+'</span></div>'+creditFeedback())+
     '<div class="pref-row" role="group" aria-labelledby="days-label"><span class="pref-icon">'+icon('calendar')+'</span><div class="pref-main"><span class="pref-label" id="days-label">등교 요일</span><div class="day-picker">'+dayNames.map((d,i)=>'<label><input type="checkbox" data-day="'+i+'" '+(r.allowedDays.includes(i)?'checked':'')+'><span>'+d+'</span></label>').join('')+'</div></div></div>'+
     prefRow('clock','수업 시간','<div class="time-range"><select id="earliestStart" aria-label="수업 시작 가능 시간">'+timeOptions(r.earliestStart)+'</select><span aria-hidden="true">–</span><select id="latestEnd" aria-label="수업 종료 한도">'+timeOptions(r.latestEnd)+'</select></div>')+
     '</div>'+courseTimes+
@@ -343,7 +342,7 @@ function comparisonCard(c,i){
   return '<button class="comparison-card '+(i===state.active?'selected':'')+'" data-action="candidate" data-value="'+i+'" aria-pressed="'+(i===state.active)+'">'+
     miniWeek(c.sections,{days:Math.max(5,...c.sections.flatMap(s=>s.meetings.map(m=>m[0]+1)))})+
     '<span class="comparison-copy"><span class="comparison-card-title"><span class="option-letter" aria-hidden="true">'+('ABCDE'[i]||i+1)+'</span><strong>'+esc(optionName(c))+'</strong>'+(i===state.active?icon('check'):'')+'</span>'+
-    '<span class="comparison-stats">'+[['calendar',o=>o.metrics.days,v=>'주 '+v+'일'],['clock',longestDay,v=>'하루 최대 '+duration(v)],['lunch',o=>o.metrics.gapMinutes,v=>'공강 '+duration(v)]].map(([name,value,text])=>
+    '<span class="comparison-stats">'+[['calendar',o=>o.metrics.days,v=>'주 '+v+'일'],['clock',longestDay,v=>'하루 최대 '+duration(v)],['compact',o=>o.metrics.gapMinutes,v=>'공강 '+duration(v)]].map(([name,value,text])=>
       '<span'+(state.options.some(o=>value(o)!==value(c))?' class="differs"':'')+'>'+icon(name)+text(value(c))+'</span>').join('')+'</span></span></button>';
 }
 function resultsView(){
@@ -358,7 +357,7 @@ function resultsView(){
     '<div class="comparison-list">'+state.options.map(comparisonCard).join('')+'</div>'+
     '<section class="criteria" aria-label="모든 추천안에서 지킨 조건"><h2>지킨 조건</h2><ul>'+kept.map(text=>'<li>'+icon('check')+'<span>'+text+'</span></li>').join('')+'</ul></section>'+
     '<div class="panel-links">'+link(icon('sliders')+'<span>조건 다시 조정하기</span>'+icon('chevron'),'preferences','row')+'</div>';
-  const week='<div class="week-card-head"><h2><span class="option-letter" aria-hidden="true">'+letter+'</span>'+esc(optionName(c))+'</h2><p class="fact-row"><span>'+icon('cap')+c.credits+'학점</span><span>'+icon('sun')+'첫 수업 '+timeText(earliest)+'</span></p></div>'+
+  const week='<div class="week-card-head"><h2><span class="option-letter" aria-hidden="true">'+letter+'</span>'+esc(optionName(c))+'</h2><p class="fact-row"><span>'+icon('book')+c.credits+'학점</span><span>'+icon('sun')+'첫 수업 '+timeText(earliest)+'</span></p></div>'+
     candidateTravelNotice(c.sections)+'<div class="week-preview timetable-surface"><div class="week-grid">'+timetable(c)+'</div></div>'+changesNotice(c)+
     '<div class="recommendation-reason"><p class="accent-text">'+flags.map(f=>'<span>'+icon('check')+f+'</span>').join('')+'</p>'+(c.metrics.lunchMissedDays?'<small>점심 1시간을 확보하지 못한 날이 '+c.metrics.lunchMissedDays+'일 있어요.</small>':'')+'</div>'+
     '<details class="disclosure"><summary>과목과 추천 이유</summary>'+(c.careerAssessment?'<p>희망 진로: '+esc(c.careerAssessment.goal)+'</p><small>'+esc(c.careerAssessment.notice)+'</small>':'')+'<p>'+esc(c.aiReason||'필수 조건을 지킨 유효 후보 중 서로 다른 시간표를 골랐어요.')+'</p>'+c.sections.map(s=>'<p>'+esc(s.name)+' · '+s.credits+'학점'+(c.careerAssessment?.evaluations.find(e=>e.courseId===s.courseId&&e.relevance!=='uncertain')?'<br>'+esc(c.careerAssessment.evaluations.find(e=>e.courseId===s.courseId).reason):'')+'</p>').join('')+'<p>'+esc(c.solverResult?.ranking_proven?'선택한 기준에서 우선순위를 확인한 결과예요.':'시간 안에 찾은 결과예요. 더 좋은 조합이 있을 수 있어요.')+'</p>'+'<p>적용 조건: '+applied.allowedDays.map(d=>dayNames[d]).join('·')+' / '+timeText(applied.earliestStart)+'–'+timeText(applied.latestEnd)+' / 총 '+applied.credits.total.min+'–'+applied.credits.total.max+'학점</p>'+(state.interpretation?.summary?'<p>'+esc(state.interpretation.summary)+'</p>':'')+(state.interpretation?.unsupported?.length?'<p>반영하지 못한 요청: '+state.interpretation.unsupported.map(esc).join(', ')+'</p>':'')+'<small>'+esc(state.catalogInfo.notice||'')+'</small></details>';
@@ -391,10 +390,10 @@ function savedView(){
   const todayRows=active.filter(e=>e.date===today&&e.kind==='class').sort((a,b)=>a.start-b.start).map(e=>'<li><button class="agenda-row '+(e.courseId?courseColor(e.courseId):'')+'" data-action="open-event" data-id="'+esc(e.id)+'"><span class="next-dot" aria-hidden="true"></span><span><strong>'+esc(e.title)+(e.end<=now?'<span class="course-tag">종료</span>':'')+'</strong><small>'+esc([timeText(e.start)+'–'+timeText(e.end),e.location].filter(Boolean).join(' · '))+'</small></span></button></li>').join('');
   const rows=agenda.map(e=>'<li><button class="agenda-row" data-action="open-event" data-id="'+esc(e.id)+'"><span class="agenda-date '+(e.date===today?'today':'')+'">'+esc(relativeDay(e.date,today))+'</span><span><strong>'+esc(e.title)+'</strong><small>'+esc([e.source==='lms'?lmsTimeLabel(e):timeText(e.start),e.location].filter(Boolean).join(' · '))+'</small></span></button></li>').join('');
   return body('<div class="page-head"><div class="heading"><h1 tabindex="-1">'+(todayClasses?'오늘 수업 '+todayClasses+'개':weekday+'요일, 수업 없음')+'</h1><p>'+esc(calendarDateLabel(today))+' · '+semesterLabel()+'</p></div>'+
-    '<div class="head-actions">'+link(icon('download')+'<span>내보내기</span>','export','secondary small')+link(icon('pencil')+'<span>다시 비교</span>',state.options.length?'results':'preferences','secondary small')+'</div></div>'+
-    '<div class="saved-layout"><div class="schedule-main"><section class="week-card" aria-label="이번 주 시간표"><div class="week-card-head"><h2>이번 주</h2><p class="fact-row"><span>'+icon('cap')+c.credits+'학점</span><span>'+icon('layers')+c.sections.length+'과목</span><span>'+icon('calendar')+'주 '+days+'일</span><span>'+icon('clock')+duration(weeklyMinutes)+'</span></p></div>'+grid+'</section></div>'+
+    '<div class="head-actions">'+link(icon('download')+'<span>내보내기</span>','export','secondary small')+link(icon('refresh')+'<span>다시 비교</span>',state.options.length?'results':'preferences','secondary small')+'</div></div>'+
+    '<div class="saved-layout"><div class="schedule-main"><section class="week-card" aria-label="이번 주 시간표"><div class="week-card-head"><h2>이번 주</h2><p class="fact-row"><span>'+icon('book')+c.credits+'학점</span><span>'+icon('layers')+c.sections.length+'과목</span><span>'+icon('calendar')+'주 '+days+'일</span><span>'+icon('clock')+duration(weeklyMinutes)+'</span></p></div>'+grid+'</section></div>'+
     '<aside class="saved-side">'+(todayRows?'<section class="agenda-card today-card"><h2>오늘</h2><ul class="agenda">'+todayRows+'</ul></section>':nextCard)+'<section class="agenda-card"><h2>다가오는 일정</h2>'+(rows?'<ul class="agenda">'+rows+'</ul>':'<p class="agenda-empty">'+icon('calendar')+'<span>일정 없음</span></p>')+'</section>'+
-    link(icon('calendar')+'<span>학기 캘린더</span>'+icon('chevron'),'calendar','row')+'</aside></div>','wide-body');
+    (state.user?'':link(icon('cap')+'<span>LMS 로그인</span>'+icon('chevron'),'login','row'))+link(icon('calendar')+'<span>학기 캘린더</span>'+icon('chevron'),'calendar','row')+'</aside></div>','wide-body');
 }
 
 function careerGroups(list,selectable=false){
@@ -436,9 +435,10 @@ function canAddEvent(date){
   const semester=store.data.semester;
   return Boolean(semester&&date>=semester.start&&date<=semester.end);
 }
+const lmsShortcut=()=>state.user?'':'<a href="#login">'+icon('cap')+'<span>LMS 로그인</span>'+icon('chevron')+'</a>';
 function calendarSemesterLabel(){return semesterLabel()+(state.lmsCalendar?' · LMS '+state.lmsCalendar.events.length+'개':'')}
 function calendarView(){
-  return body('<div class="planner-page-heading"><div class="heading"><h1 tabindex="-1">학기 캘린더</h1><p id="calendar-semester-label">'+calendarSemesterLabel()+'</p></div>'+link(icon('download'),'export','icon-button outlined','aria-label="내보내기"')+'</div>'+
+  return body('<div class="planner-page-heading"><div class="heading"><h1 tabindex="-1">학기 캘린더</h1><p id="calendar-semester-label">'+calendarSemesterLabel()+'</p></div><div class="head-actions">'+link(icon('cap')+'<span>'+(state.user?'LMS 연결됨':'LMS 로그인')+'</span>','login','secondary','id="calendar-lms"')+link(icon('download'),'export','icon-button outlined','aria-label="내보내기"')+'</div></div>'+
     '<section class="calendar-surface" aria-label="학기 일정 보기">'+
     '<div class="calendar-toolbar"><div class="calendar-mode" role="group" aria-label="캘린더 보기">'+
     Object.entries(calendarModes).map(([mode,label])=>button(label,'calendar-mode','quiet','data-value="'+mode+'" aria-pressed="'+(mode===state.calendarMode)+'"')).join('')+
@@ -450,7 +450,7 @@ function calendarView(){
     '<input type="date" id="calendar-date" value="'+state.selectedDate+'"></label></div>'+
     '<label id="calendar-class-filter" hidden><input id="show-calendar-classes" type="checkbox" '+(state.showCalendarClasses?'checked':'')+'> 월간에 일반 수업 표시</label>'+
     plannerGrid('<div id="semester-calendar"></div>',{id:'calendar-grid-scroll',label:'학기 캘린더 격자',mode:state.calendarMode,guide:true})+
-    '</section><div id="lms-slot"></div>','calendar-body');
+    '</section>','calendar-body');
 }
 function updateCalendarControls(){
   if(!$('calendar-date'))return;
@@ -459,7 +459,7 @@ function updateCalendarControls(){
   $('semester-calendar').dataset.calendarView=state.calendarMode;
   $('calendar-grid-scroll').parentElement.dataset.mode=state.calendarMode;
   $('calendar-grid-scroll').tabIndex=state.calendarMode==='week'?0:-1;
-  highlightCalendarDate($('semester-calendar'),state.selectedDate);
+  highlightCalendarDate($('semester-calendar'),state.selectedDate);revealSelectedDay();
   $('calendar-class-filter').hidden=state.calendarMode!=='month';
   $('calendar-add').disabled=!canAddEvent(state.selectedDate);
   $('calendar-add').title=$('calendar-add').disabled?'시간표를 저장한 학기 안에서 일정을 추가할 수 있어요.':'';
@@ -492,6 +492,13 @@ function refreshCalendarEvents(){
     calendarWidget.refetchEvents();
   });
 }
+function revealSelectedDay(){
+  const scroll=$('calendar-grid-scroll'),cell=scroll?.querySelector('[data-calendar-header][data-calendar-selected]');
+  if(!cell||scroll.scrollWidth<=scroll.clientWidth)return;
+  // The selected day starts right after the pinned hour column, so no column sits half under it.
+  const hours=scroll.querySelector('[data-calendar-header]').getBoundingClientRect().left-$('semester-calendar').getBoundingClientRect().left;
+  scroll.scrollLeft+=cell.getBoundingClientRect().left-scroll.getBoundingClientRect().left-hours;
+}
 function mountSemesterCalendar(){
   updateCalendarControls();
   calendarWidget=mountCalendar($('semester-calendar'),{
@@ -506,6 +513,8 @@ function mountSemesterCalendar(){
       if(canAddEvent(date))addEvent();
     }
   });
+  // The library sizes its hour column after the first paint, so follow the day columns until they settle.
+  requestAnimationFrame(()=>{const first=$('calendar-grid-scroll')?.querySelector('[data-calendar-header]');if(first)new ResizeObserver(revealSelectedDay).observe(first)});
 }
 function eventEditor(){
   const d=state.eventDraft,original=state.eventOriginal,cancelled=original?.status==='cancelled';
@@ -543,12 +552,12 @@ function exportView(){
     '<div class="export-card">'+icon('download')+'<h2>'+semesterLabel()+' 일정</h2><p>일정 '+active.length+'개, .ics 파일</p>'+(semester?'<small>'+semester.start+' ~ '+semester.end+'</small>':'')+'</div>'+
     info('변경한 일정까지 함께','휴강과 취소한 일정은 빼고, 시험과 개인 일정은 넣어요.',icon('calendar'))+
     '<ol class="export-help"><li>아래 버튼으로 일정 파일을 저장해요.</li><li>쓰는 캘린더에서 가져오기를 선택해요.</li><li>저장한 .ics 파일을 고르면 끝이에요.</li></ol><small>가져간 뒤의 변경은 자동으로 동기화되지 않아요.</small>','narrow')+
-    footer(active.length?button('캘린더 파일 다운로드','download'):link('LMS 일정 가져오기','calendar','primary'));
+    footer(active.length?button('캘린더 파일 다운로드','download'):link('LMS 일정 가져오기','login','primary'));
 }
 const exampleDefinitions=[
-  {title:'전공의 기초를 단단하게',description:'자료구조와 알고리즘을 함께 살펴보는 조합',names:['자료구조','알고리즘'],color:'sage'},
+  {title:'전공의 기초를 단단하게',description:'자료구조와 알고리즘을 함께 살펴보는 조합',names:['자료구조','알고리즘'],color:'lime'},
   {title:'데이터와 친해지는 한 학기',description:'통계와 데이터베이스를 연결해 보는 조합',names:['통계','데이터베이스'],color:'lavender'},
-  {title:'직접 만드는 경험을 더해요',description:'웹과 오픈소스 과목에 관심이 있다면',names:['웹','오픈소스'],color:'blue'}
+  {title:'직접 만드는 경험을 더해요',description:'웹과 오픈소스 과목에 관심이 있다면',names:['웹','오픈소스'],color:'sky'}
 ];
 function examples(){return exampleDefinitions.map(e=>({...e,ids:e.names.flatMap(name=>{const c=state.courses.find(c=>c.name.includes(name)&&c.availableSectionCount!==0);return c?[c.id]:[]})})).filter(e=>e.ids.length)}
 function experienceView(){
@@ -590,38 +599,18 @@ function aiView(){
     footer(button('AI로 시간표 추천받기','recommend-ai','primary',s?.connected?'':'disabled')+button('현재 조건으로 기본 추천','recommend','secondary'));
 }
 function userBar(){
-  if(state.user)return '<div class="account"><span class="avatar" title="'+esc(state.user.studentId)+'">'+esc(String(state.user.studentId).slice(-2))+'</span>'+button(icon('logout'),'logout','icon-button','aria-label="로그아웃"')+'</div>';
-  return '<div class="account">'+link(icon('user'),'login','icon-button','aria-label="로그인"')+'</div>';
+  const name=state.user?.name||'';
+  return '<div class="account"><a class="account-link" href="#login" '+(state.route==='login'?'aria-current="page" ':'')+(state.user?'aria-label="계정'+(name?': '+esc(name):'')+'"':'')+'>'+
+    (state.user?'<span class="avatar">'+(name?esc([...name][0]):icon('user'))+'</span><span>계정</span>':icon('user')+'<span>로그인</span>')+'</a></div>';
 }
-function signedInView(message){
-  return body('<section class="auth-card">'+heading('이미 로그인되어 있어요',esc(state.user.studentId)+' 학번으로 로그인되어 있어요. '+message)+
-    '<div class="inline-actions">'+link('내 시간표 보기',navHref('home'),'primary')+button('로그아웃','logout','secondary')+'</div></section>','narrow auth-body');
-}
+// Signing up and signing in are the same act: logging in to the school LMS. The panel itself lives in index.html.
 function loginView(){
-  if(state.user)return signedInView('다른 계정을 쓰려면 먼저 로그아웃해 주세요.');
-  return body('<section class="auth-card"><p class="auth-brand">'+brandMark+'<span>캠퍼스 시간표</span></p>'+heading('로그인')+
-    '<form id="login-form" class="stack">'+
-    field('학번','<input id="login-student-id" name="studentId" type="text" inputmode="numeric" placeholder="예: 20240001" required autofocus autocomplete="username">')+
-    field('비밀번호','<input id="login-password" name="password" type="password" required autocomplete="current-password">')+
-    '<p id="login-error" class="form-error" role="alert"></p>'+
-    '<button id="login-submit" type="submit" class="button primary">로그인</button>'+
-    '<p class="auth-switch-link"><span>처음이라면</span><a href="#signup">회원가입</a></p></form></section>','narrow auth-body');
-}
-function signupView(){
-  if(state.user)return signedInView('새 계정을 만들려면 먼저 로그아웃해 주세요.');
-  return body('<section class="auth-card">'+heading('회원가입')+
-    '<form id="signup-form" class="stack">'+
-    field('학번','<input id="signup-student-id" name="studentId" type="text" inputmode="numeric" placeholder="예: 20240001" required autofocus autocomplete="username">')+
-    field('비밀번호','<input id="signup-password" name="password" type="password" required autocomplete="new-password">')+
-    field('비밀번호 확인','<input id="signup-password-confirm" name="passwordConfirm" type="password" required autocomplete="new-password">')+
-    '<p id="signup-error" class="form-error" role="alert"></p>'+
-    '<button id="signup-submit" type="submit" class="button primary">회원가입</button>'+
-    '<p class="auth-switch-link"><span>이미 계정이 있다면</span><a href="#login">로그인</a></p></form></section>','narrow auth-body');
+  return body('<section class="auth-card"><p class="auth-brand">'+brandMark+'<span>캠퍼스 시간표</span></p><h1 class="sr-only" tabindex="-1">계정</h1><div id="lms-slot"></div></section>','narrow auth-body');
 }
 
 const views={start:startView,courses:coursesView,preferences:preferencesView,advanced:advancedView,results:resultsView,saved:savedView,career:careerView,'career-list':careerListView,calendar:calendarView,export:exportView,experience:experienceView,record:recordView,empty:emptyView,loading:loadingView,error:errorView,ai:aiView};
 views.programs=()=>body(careerTabs('programs')+programView({goal:state.programGoal,busy:state.programBusy,loading:state.programLoading,meta:state.programMeta,error:state.programError,list:programStore.list,includeUpcoming:state.programUpcoming,storageError:programStore.error}),'program-body');
-views.login=loginView;views.signup=signupView;
+views.login=loginView;
 function render(motion='none'){
   const sameRoute=$('content')?.dataset.route===state.route,focused=document.activeElement;
   const scroller=()=>document.querySelector('.workspace-panel')||document.querySelector('.screen-body');
@@ -648,7 +637,7 @@ function render(motion='none'){
   else if(motion==='list')animateElements(document.querySelectorAll('#course-list > .course-card'),{distance:6,duration:240,stagger:25});
 }
 // Depth decides the direction: deeper screens push in from the right, going back pops, sibling tabs fade through.
-const routeDepth={start:0,saved:0,career:0,'career-list':0,programs:0,calendar:0,login:1,signup:1,export:1,experience:1,record:2,courses:1,preferences:2,advanced:3,ai:3,loading:4,results:5,empty:5,error:5};
+const routeDepth={start:0,saved:0,career:0,'career-list':0,programs:0,calendar:0,login:1,export:1,experience:1,record:2,courses:1,preferences:2,advanced:3,ai:3,loading:4,results:5,empty:5,error:5};
 function navigationKind(from,to){
   if(!from||from===to)return null;
   const a=routeDepth[from]??0,b=routeDepth[to]??0;
@@ -846,17 +835,6 @@ async function checkConnection(){
 }
 async function act(action,el){
   switch(action){
-    case 'logout':{
-      try{
-        await auth.logout();
-        state.user=null;
-        flash('로그아웃되었습니다.');
-        render();
-      }catch(err){
-        flash(err.message,true);
-      }
-      break;
-    }
     case 'back':back();break;
     case 'step':go(el.dataset.value);break;
     case 'credit-step':{
@@ -1032,57 +1010,8 @@ document.addEventListener('change',e=>{
   if(el.form?.id==='event-form')readEventDraft(el.form);
 });
 
-async function handleLoginSubmit(form){
-  const studentId=form.studentId.value.trim();
-  const password=form.password.value;
-  const errorEl=$('login-error');
-  const btn=$('login-submit');
-  errorEl.textContent='';
-  btn.disabled=true;
-  btn.textContent='로그인 중...';
-  try{
-    const res=await auth.login({studentId,password});
-    state.user=res.user;
-    flash((res.user?.studentId||studentId)+'님, 로그인되었습니다!');
-    go('start');
-  }catch(err){
-    errorEl.textContent=err.message;
-  }finally{
-    btn.disabled=false;
-    btn.textContent='로그인';
-  }
-}
-async function handleSignupSubmit(form){
-  const studentId=form.studentId.value.trim();
-  const password=form.password.value;
-  const passwordConfirm=form.passwordConfirm.value;
-  const errorEl=$('signup-error');
-  const btn=$('signup-submit');
-  errorEl.textContent='';
-  if(password!==passwordConfirm){
-    errorEl.textContent='비밀번호가 일치하지 않습니다.';
-    return;
-  }
-  btn.disabled=true;
-  btn.textContent='가입 처리 중...';
-  try{
-    await auth.signup({studentId,password});
-    flash('회원가입에 성공했습니다! 로그인해 주세요.');
-    go('login');
-  }catch(err){
-    errorEl.textContent=err.message;
-  }finally{
-    btn.disabled=false;
-    btn.textContent='회원가입';
-  }
-}
-
 document.addEventListener('submit',e=>{
-  e.preventDefault();if(e.target.id==='login-form'){
-      handleLoginSubmit(e.target);
-    }else if(e.target.id==='signup-form'){
-      handleSignupSubmit(e.target);
-    }else if(e.target.id==='relax-form'){
+  e.preventDefault();if(e.target.id==='relax-form'){
     try{const request=structuredClone(state.request);request.relaxationPolicy=relaxationPolicy(request,e.target);closeDialog();recommend('relax',request)}catch(error){$('relax-error').textContent=error.message}
   }else if(e.target.id==='semester-form'){
     try{
@@ -1154,6 +1083,7 @@ async function init(){
     syncCreditPlan();
     routeChanged();if(store.readError)flash(store.readError,true);
     if(!lmsReady){lmsReady=true;setupLms({
+      setLmsAccount(user){if((state.user?.key||null)===(user?.key||null))return;state.user=user;render()},
       setLmsCalendar(value){
         if(state.lmsCalendar===value)return;
         state.lmsCalendar=value;
@@ -1173,11 +1103,4 @@ async function init(){
   }catch(error){state.error=error.message;state.route='error';render()}
 }
 
-// Only a remembered sign-in needs checking; anonymous visits never wait on the account server.
-if(state.user)auth.getMe().then(user=>{
-  if((state.user?.studentId||null)!==(user?.studentId||null)){
-    state.user=user;
-    render();
-  }
-}).catch(()=>{});
 init();

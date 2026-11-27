@@ -295,7 +295,7 @@ test('LA 시간대 Chrome에서 LMS 마감·종일·자정 넘는 일정과 편�
   const {page, saved} = await openCalendar(t, fixture(), {
     lms: () => ({connection: 'connected', accountKey, courses, result})
   });
-  await page.locator('#lms-result').waitFor();
+  await page.locator('#calendar-semester-label', {hasText: 'LMS 3개'}).waitFor();
   const event = raw => calendarEvent(page, 'lms:' + accountKey + ':' + raw.id);
   await dateInput(page).fill('2026-11-10');
   await event(deadline).scrollIntoViewIfNeeded();

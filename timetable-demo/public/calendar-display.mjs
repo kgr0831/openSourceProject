@@ -57,7 +57,7 @@ function courseColors(index) {
 
 export function eventKindLabel(event) {
   if (event.status === 'cancelled') return event.kind === 'class' ? '휴강' : kindLabels[event.kind] + ' 취소';
-  if (event.source === 'lms') return 'LMS · ' + lmsKindLabel(event);
+  if (event.source === 'lms') { const kind = lmsKindLabel(event); return kind.startsWith('LMS') ? kind : 'LMS · ' + kind; }
   if (event.examMode === 'replacement') return '대체 시험';
   if (event.examMode === 'additional') return '별도 시험';
   return kindLabels[event.kind];
