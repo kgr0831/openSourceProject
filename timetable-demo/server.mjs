@@ -40,7 +40,6 @@ files['/calendar-view.js']=['calendar-view.js','text/javascript; charset=utf-8']
 files['/calendar.css']=['calendar.css','text/css; charset=utf-8'];
 files['/lms.css']=['lms.css','text/css; charset=utf-8'];
 files['/walking-route-times.mjs']=['walking-route-times.mjs','text/javascript; charset=utf-8'];
-files['/auth.js']=['auth.js','text/javascript; charset=utf-8'];
 const calendarAssets=new Map([
   ['calendar.js','all/global.js'], ['theme.js','themes/monarch/global.js'], ['ko.js','locales/ko/global.js'],
   ['skeleton.css','skeleton.css'], ['theme.css','themes/monarch/theme.css'], ['palette.css','themes/monarch/palettes/blue.css']
@@ -66,14 +65,6 @@ const server=http.createServer(async(req,res)=>{
   const controller=new AbortController();
   res.once('close',()=>{if(!res.writableEnded)controller.abort()});
   try {
-    // Account requests stay on this origin: nginx serves /auth on the hosted site, this forwards it locally.
-    // ponytail: plain pass-through to one local API; add timeouts and header filtering if it ever leaves loopback.
-    if(url.pathname.startsWith('/auth/')){
-      const upstream=http.request({host:'127.0.0.1',port:Number(process.env.COMMUNITY_API_PORT||4000),path:url.pathname+url.search,method:req.method,headers:{...req.headers,host:'127.0.0.1'}},
-        api=>{res.writeHead(api.statusCode,api.headers);api.pipe(res)});
-      upstream.on('error',()=>{if(!res.headersSent)reply(res,502,{error:'로그인 서버에 연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.'})});
-      return req.pipe(upstream);
-    }
     if(req.method==='GET' && files[url.pathname]){const [file,type]=files[url.pathname];return reply(res,200,await readFile(path.join(root,'public',file)),type)}
     if(req.method==='GET' && url.pathname.startsWith('/vendor/fullcalendar/')){
       const file=calendarAssets.get(url.pathname.slice('/vendor/fullcalendar/'.length));
@@ -82,7 +73,7 @@ const server=http.createServer(async(req,res)=>{
       try{return reply(res,200,await readFile(path.join(root,'node_modules','fullcalendar',file)),type)}
       catch(error){if(error.code==='ENOENT')return reply(res,404,{error:'캘린더 구성 요소를 먼저 설치해 주세요.'});throw error}
     }
-    if(req.method==='GET' && /^\/assets\/(?:favicon\.svg|pretendard-(?:400|500|600|700)\.woff2|OFL-Pretendard\.txt)$/.test(url.pathname)){
+    if(req.method==='GET' && /^\/assets\/(?:favicon\.svg|ui-(?:chevron|calendar|clock)\.svg|app-icon-(?:180|512)\.png|pretendard-(?:400|500|600|700)\.woff2|OFL-Pretendard\.txt)$/.test(url.pathname)){
       const type=url.pathname.endsWith('.svg')?'image/svg+xml':url.pathname.endsWith('.woff2')?'font/woff2':'text/plain; charset=utf-8';
       try{return reply(res,200,await readFile(path.join(root,'public',url.pathname.slice(1))),type)}
       catch(error){if(error.code==='ENOENT')return reply(res,404,{error:'파일을 찾을 수 없습니다.'});throw error}

@@ -1,20 +1,20 @@
 :root {
-  --fc-monarch-primary: #2f5bea;
-  --fc-monarch-primary-over: #244bd0;
-  --fc-monarch-primary-down: #1c3da8;
+  --fc-monarch-primary: #0b7a63;
+  --fc-monarch-primary-over: #096350;
+  --fc-monarch-primary-down: #074c3e;
   --fc-monarch-secondary: #f3f4f6;
   --fc-monarch-secondary-foreground: #17181c;
   --fc-monarch-secondary-over: #e9ebee;
   --fc-monarch-secondary-down: #d3d6db;
-  --fc-monarch-tertiary: #2f5bea;
-  --fc-monarch-tertiary-foreground: #ffffff;
-  --fc-monarch-tertiary-over: #244bd0;
-  --fc-monarch-tertiary-down: #1c3da8;
-  --fc-monarch-highlight: #2f5bea1a;
-  --fc-monarch-selected: #2f5bea;
-  --fc-monarch-selected-over: #244bd0;
-  --fc-monarch-selected-down: #1c3da8;
-  --fc-monarch-outline: #2f5bea;
+  --fc-monarch-tertiary: #20c5a0;
+  --fc-monarch-tertiary-foreground: #06231c;
+  --fc-monarch-tertiary-over: #17b390;
+  --fc-monarch-tertiary-down: #17b390;
+  --fc-monarch-highlight: #20c5a033;
+  --fc-monarch-selected: #0b7a63;
+  --fc-monarch-selected-over: #096350;
+  --fc-monarch-selected-down: #074c3e;
+  --fc-monarch-outline: #0b7a63;
 }
 
 .planner-screen :is(.button, .bottom-nav a),
@@ -48,11 +48,16 @@
   min-inline-size: 0;
 }
 
+/* The frame keeps the rounded border; a wide week scrolls inside it. */
+.calendar-surface .planner-grid-scroll {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+}
+
 .planner-grid-frame[data-mode="week"] .planner-grid-scroll {
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scrollbar-color: var(--ink-300) var(--sunken);
-  border-radius: 10px;
 }
 
 @container planner-grid (width < 51rem) {
@@ -113,14 +118,14 @@
   flex-wrap: wrap;
   max-inline-size: 100%;
   background: var(--sunken);
-  padding: 3px;
-  border-radius: 12px;
+  padding: 4px;
+  border-radius: 999px;
 }
 
 .calendar-mode .button {
   padding-inline: clamp(6px, 1.2vw, 14px);
   min-inline-size: 44px;
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: 0.875rem;
   white-space: nowrap;
 }
@@ -155,7 +160,7 @@
   inline-size: auto;
   min-inline-size: 0;
   min-block-size: 44px;
-  padding: 6px 8px;
+  padding-block: 6px;
   font-size: 1rem;
 }
 
@@ -176,8 +181,6 @@
 
 #semester-calendar {
   min-inline-size: 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
   color: var(--ink);
 }
 
@@ -187,7 +190,6 @@
 
 #semester-calendar [data-calendar-selected] {
   background: var(--brand-soft);
-  box-shadow: inset 0 2px var(--brand);
 }
 
 #semester-calendar .calendar-event {
@@ -244,12 +246,13 @@
 
 #semester-calendar .calendar-event.course-colored {
   border-inline-start-color: var(--block);
+  border-radius: 10px;
   background-color: var(--block);
-  color: #fff;
+  color: var(--block-ink);
 }
 
 .course-colored .calendar-event-content {
-  color: #fff;
+  color: var(--block-ink);
 }
 
 .course-colored .calendar-event-kind {
@@ -465,4 +468,10 @@
   .planner-dialog-actions {
     padding-block-end: max(8px, env(safe-area-inset-bottom));
   }
+}
+
+/* A week column is narrow: let the title and time wrap instead of cutting them. */
+#semester-calendar[data-calendar-view="week"] .calendar-event-content > * {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }

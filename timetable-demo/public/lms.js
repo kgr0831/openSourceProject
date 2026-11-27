@@ -23,6 +23,7 @@ export function setupLms(planner){
       }catch{localNotice='저장된 LMS 일정을 읽지 못했어요. 원래 기록은 보존했으니 과목을 선택해 다시 가져와 주세요.'}
     }
     planner.setLmsCalendar(cache);
+    planner.setLmsAccount(account?{key:account,name:state.accountName||''}:null);
   }
 
   function apply(next,sequence){
@@ -60,7 +61,7 @@ export function setupLms(planner){
     catch(error){
       if(error.sequence<applied){timer=setTimeout(refresh,1200);return}
       applied=error.sequence;
-      planner.setLmsCalendar(null);state=null;account=null;cache=null;
+      planner.setLmsCalendar(null);planner.setLmsAccount(null);state=null;account=null;cache=null;
       localNotice='학교 연결 상태를 확인하지 못했어요. 시간표 데모가 실행 중인지 확인한 뒤 다시 연결해 주세요.';render();
     }
     timer=setTimeout(refresh,running()||busyConnections.has(state?.connection)?1200:5000);
@@ -94,23 +95,24 @@ export function setupLms(planner){
     $('lms-no-courses').hidden=visible.length>0;
     $('lms-selection-count').textContent=`${selected.size}개 선택`;
     $('lms-sync').disabled=locked()||!account||!selected.size;
-    $('lms-sync').textContent=cache?'선택한 과목 일정 새로고침':'선택한 과목 일정 가져오기';
+    $('lms-sync').textContent=cache?'일정 새로고침':'일정 가져오기';
     for(const id of ['lms-search','lms-term','lms-select-visible','lms-clear'])$(id).disabled=locked();
   }
 
   function render(){
     const connection=state?.connection||'disconnected',pending=busyConnections.has(connection),connected=connection==='connected';
-    const titles={restoring:'저장된 학교 로그인 확인 중',opening:'학교 로그인 창을 열고 있어요',waiting:'학교 창에서 로그인을 완료해 주세요',checking:'로그인 확인 중',loading:'내 수강 과목을 확인하고 있어요',background:'학교 연결을 백그라운드로 전환 중',disconnecting:'학교 연결을 해제하고 있어요',connected:'학교 계정 연결됨',disconnected:'내 수강 과목과 연결하기',error:'학교 계정을 다시 연결해 주세요'};
+    const titles={restoring:'저장된 학교 로그인 확인 중',opening:'학교 로그인 창을 열고 있어요',waiting:'학교 창에서 로그인을 완료해 주세요',checking:'로그인 확인 중',loading:'내 수강 과목을 확인하고 있어요',background:'학교 연결을 백그라운드로 전환 중',disconnecting:'학교 연결을 해제하고 있어요',connected:state?.accountName||'LMS 계정',disconnected:'숭실대 LMS로 시작하기',error:'다시 로그인해 주세요'};
     $('lms-connection-title').textContent=state?.job?.reconnect?'학교 계정을 다시 연결해 주세요':titles[connection];
-    $('lms-connection-description').textContent=connected?(state.remembered?'다음 실행에도 이 프로젝트의 학교 연결을 복원해요.':'이 실행에서 연결되어 있어요. 다음에 다시 로그인해야 할 수 있어요.'):pending?'로그인이 끝나면 학교 창은 자동으로 닫힙니다.':'연결 후 가져올 과목을 직접 고를 수 있어요.';
-    $('lms-badge').textContent=running()?'일정 가져오는 중':pending?'연결 중':account?'연결됨':'연결 필요';
-    $('lms-badge').className=account?'badge':'badge neutral';
-    $('lms-connect').hidden=connected&&!state?.job?.reconnect;
+    $('lms-connection-description').textContent=connected?(state.remembered?'이 PC에서 로그인이 유지돼요.':'앱을 다시 열면 로그인이 필요할 수 있어요.'):pending?'로그인이 끝나면 학교 창은 자동으로 닫혀요.':'학교 로그인 창에서 로그인하면 가입과 연결이 함께 끝나요.';
+    $('lms-badge').textContent=running()?'가져오는 중':pending?'연결 중':account?'연결됨':'';
+    $('lms-badge').className=account?'badge':'badge neutral';$('lms-badge').hidden=!$('lms-badge').textContent;
+    $('lms-panel').classList.toggle('signed-in',Boolean(account));
+    $('lms-connect').hidden=pending||connected&&!state?.job?.reconnect;
     $('lms-connect').disabled=acting||running()||pending;
-    $('lms-connect').textContent=state?.job?.reconnect?'학교 계정 다시 연결':'숭실대 LMS 연결';
+    $('lms-connect-label').textContent=state?.job?.reconnect?'다시 로그인':'LMS로 로그인';
     $('lms-disconnect').hidden=!connected&&!pending;
     $('lms-disconnect').disabled=acting||running()||connection==='disconnecting';
-    $('lms-disconnect').textContent=pending?'연결 취소':'학교 로그아웃';
+    $('lms-disconnect').textContent=pending?'취소':'로그아웃';
     $('lms-login-help').hidden=!['waiting','checking'].includes(connection);
     $('lms-confirm').disabled=acting||connection!=='waiting';$('lms-focus').disabled=acting;
     const message=localNotice||state?.notice||'';
@@ -125,7 +127,7 @@ export function setupLms(planner){
     }
     $('lms-result').hidden=!cache;
     if(cache){
-      $('lms-result-title').textContent=`LMS 일정 ${cache.events.length}개가 캘린더에 있어요.`;
+      $('lms-result-title').textContent=`LMS 일정 ${cache.events.length}개`;
       $('lms-result-detail').textContent=resultDetail||'마지막 가져오기 · '+new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',dateStyle:'medium',timeStyle:'short'}).format(new Date(cache.syncedAt));
       $('lms-show-calendar').disabled=!cache.events.length;
     }
