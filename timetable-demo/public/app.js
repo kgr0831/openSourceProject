@@ -14,12 +14,14 @@ import {courseCompatibilityNotice,candidateTravelNotice} from './timetable-warni
 import {courseFilterControls,selectedCourseTimes} from './course-flow-ui.js';
 import {courseFilterOptions,matchesCourseFilters} from './course-filters.mjs';
 import {courseCreditPlan,defaultCreditRanges,selectedCredits} from './course-credits.mjs';
+import * as auth from './auth.js';
 
 const $=id=>document.getElementById(id);
 const emptyCourseFilters=()=>({completion:[],credits:[],years:[]});
 const store=createPlannerStore({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)});
 const programStore=createProgramStore({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value),removeItem:key=>localStorage.removeItem(key)});
 const state={
+  user:auth.getCachedUser(),
   courses:[],catalogInfo:{},catalogBusy:false,request:null,options:[],active:0,query:'',kind:'major',showAll:false,route:'start',
   courseFilters:emptyCourseFilters(),creditChoice:{mode:'auto'},creditFeedback:{},
   careerGoal:store.data.careerRecommendations?.goal||'',careerBusy:false,selectedDate:koreanToday(),selectedMinute:null,
@@ -34,6 +36,7 @@ const calendarOptions=()=>({externalEvents:state.lmsCalendar?.events||[]});
 const titles={start:'캠퍼스 시간표',courses:'과목 고르기',preferences:'생활 패턴 정하기',advanced:'세부 선호',results:'추천 시간표',saved:'내 시간표',career:'희망진로 검색','career-list':'진로 추천 과목',calendar:'학기 일정',export:'캘린더 내보내기',experience:'수강 경험',record:'나의 수강 기록',empty:'추천 결과',loading:'시간표 찾는 중',error:'연결 확인',ai:'AI에게 요청하기'};
 const designScreen={results:'resultA','career-list':'career'};
 titles.programs='비교과 추천';designScreen.programs='career';
+titles.login='로그인';titles.signup='회원가입';designScreen.login='courses';designScreen.signup='courses';
 function current(){return state.options[state.active]}
 const scopeStorageKey='ssu-timetable-catalog-scope';
 function careerList(request=state.request){const list=store.data.careerRecommendations;return list&&list.term===request.term&&list.department===request.department&&list.catalogVersion===request.catalogVersion&&(list.source!=='course-evidence-ai'||list.careerDataVersion===state.catalogInfo.careerDataVersion)?list:null}
@@ -62,7 +65,7 @@ async function changeCatalog(scope){
 function semesterLabel(){const start=store.data.semester?.start||koreanToday();return start.slice(0,4)+'년 '+(Number(start.slice(5,7))<=6?'1':'2')+'학기'}
 function flash(text,error=false){clearTimeout(toastTimer);$('toast').textContent=text;$('toast').className='toast'+(error?' error':'');$('toast').hidden=false;toastTimer=setTimeout(()=>$('toast').hidden=true,5500)}
 function go(route){if(location.hash==='#'+route){state.route=route;render()}else location.hash=route}
-function back(){go(({courses:'start',preferences:'courses',advanced:'preferences',results:'preferences',career:'start','career-list':'career',programs:'start',calendar:'saved',experience:'career',record:'experience',export:'calendar',ai:'preferences',empty:'preferences',loading:'preferences',error:'preferences'})[state.route]||'saved')}
+function back(){go(({courses:'start',preferences:'courses',advanced:'preferences',results:'preferences',career:'start','career-list':'career',programs:'start',calendar:'saved',experience:'career',record:'experience',export:'calendar',ai:'preferences',empty:'preferences',loading:'preferences',error:'preferences',login:'start',signup:'start'})[state.route]||'saved')}
 async function api(route,body,signal){
   const r=await fetch('/api/'+route,{...(body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-Timetable-App':'1'},body:JSON.stringify(body)}),signal:signal||AbortSignal.timeout(20000)});
   const data=await r.json();if(!r.ok)throw new Error(data.error||'잠시 뒤 다시 시도해 주세요.');return data;
@@ -81,11 +84,14 @@ function renderHeader(){
 function sidebar(){
   const saved=state.route==='saved',screen=saved?'desktopSaved':'desktopCompare';
   const nav=[['saved','내 시간표','imgGrid1'],['courses','시간표 추천','imgSpark'],['career-list','추천 과목','imgBook'],['programs','비교과 추천','imgBook'],['calendar','학기 일정','imgCalendar']];
+  const userSection=state.user
+    ? '<div class="sidebar-user"><span class="sidebar-user-name">'+esc(state.user.studentId)+'님</span>'+button('로그아웃','logout','quiet','style="padding:0;min-height:auto;font-size:12px;"')+'</div>'
+    : '<div class="sidebar-user-links"><a href="#login" class="side-auth-link">로그인</a><span>|</span><a href="#signup" class="side-auth-link">회원가입</a></div>';
   return '<aside class="sidebar"><a class="brand" href="#start">'+icon(screen,'imgGrid')+'<span>캠퍼스 시간표</span></a><nav aria-label="주 메뉴">'+nav.map(([route,label,img],i)=>{
     const active=route==='saved'?saved:route==='courses'?['courses','preferences','results','advanced','ai'].includes(state.route):route===state.route;
     const iconScreen=img==='imgGrid1'?(active?'desktopSaved':'desktopCompare'):img==='imgSpark'?(active?'desktopCompare':'desktopSaved'):screen;
     return (i===2?'<hr>':'')+'<a class="side-link '+(active?'active':'')+'" href="#'+route+'" '+(active?'aria-current="page"':'')+'>'+icon(iconScreen,img)+label+'</a>';
-  }).join('')+'</nav><p class="school">숭실대학교<br>'+esc(state.request?.department||state.catalogInfo.department||'')+'</p></aside>';
+  }).join('')+'</nav>'+userSection+'<p class="school">숭실대학교<br>'+esc(state.request?.department||state.catalogInfo.department||'')+'</p></aside>';
 }
 function bottomNav(active){
   const screen=active==='calendar'?'calendar':'saved';
@@ -442,8 +448,76 @@ function aiView(){
     '<div class="card ai-connection"><strong>'+(s?.connected?'Codex가 연결되어 있어요':waiting?'브라우저에서 연결을 마쳐 주세요':'Codex 계정 연결')+'</strong><p id="ai-status" role="status">'+esc(state.aiMessage||'본인의 계정으로 요청을 해석하고 추천 이유를 정리해요.')+'</p>'+(waiting?button('연결 취소','cancel-login','secondary'):button(s?.connected?'연결 확인':'Codex 연결','connect','secondary'))+'</div><small>요청 내용에 따라 기존 학점·요일·필수 과목 조건이 바뀔 수 있어요. 결과의 적용 조건을 확인해 주세요.</small>')+
     footer(button('AI로 시간표 추천받기','recommend-ai','primary',s?.connected?'':'disabled')+button('현재 조건으로 기본 추천','recommend','secondary'));
 }
+
+function userBar(){
+  if(state.user){
+    return '<span class="user-label"><span class="user-chip"><span class="user-dot"></span>'+esc(state.user.studentId)+'님</span>'+button('로그아웃','logout','quiet','style="padding:4px 8px;min-height:auto;font-size:13px;"')+'</span>';
+  }
+  return '<span class="user-label"><a href="#login" class="button quiet" style="padding:4px 10px;min-height:auto;font-size:13px;">로그인</a><a href="#signup" class="button primary" style="padding:6px 14px;min-height:auto;font-size:13px;border-radius:10px;">회원가입</a></span>';
+}
+
+function loginView(){
+  if(state.user){
+    return body(
+      heading('이미 로그인되어 있어요', esc(state.user.studentId)+' 학번으로 로그인되어 있습니다.')+
+      '<div class="card stack" style="max-width:420px;margin:24px auto;text-align:center;">'+
+      '<p>다른 계정으로 이용하시려면 먼저 로그아웃해 주세요.</p>'+
+      '<div style="display:flex;gap:12px;justify-content:center;margin-top:8px;">'+
+      link('내 시간표 보기','saved','primary')+
+      button('로그아웃','logout','secondary')+
+      '</div></div>'
+    );
+  }
+  return body(
+    heading('로그인','학번과 비밀번호를 입력해 주세요.')+
+    '<div class="card" style="max-width:420px;margin:24px auto;">'+
+    '<form id="login-form" class="stack">'+
+    field('학번','<input id="login-student-id" name="studentId" type="text" placeholder="학번 입력 (예: 20240001)" required autofocus autocomplete="username">')+
+    field('비밀번호','<input id="login-password" name="password" type="password" placeholder="비밀번호 입력" required autocomplete="current-password">')+
+    '<p id="login-error" class="form-error" role="alert"></p>'+
+    '<button id="login-submit" type="submit" class="button primary">로그인</button>'+
+    '<div class="auth-switch-link">'+
+    '<span>아직 계정이 없으신가요?</span>'+
+    '<a href="#signup">회원가입</a>'+
+    '</div>'+
+    '</form>'+
+    '</div>'
+  );
+}
+
+function signupView(){
+  if(state.user){
+    return body(
+      heading('이미 로그인되어 있어요', esc(state.user.studentId)+' 학번으로 로그인되어 있습니다.')+
+      '<div class="card stack" style="max-width:420px;margin:24px auto;text-align:center;">'+
+      '<p>새로운 계정을 등록하시려면 먼저 로그아웃해 주세요.</p>'+
+      '<div style="display:flex;gap:12px;justify-content:center;margin-top:8px;">'+
+      link('내 시간표 보기','saved','primary')+
+      button('로그아웃','logout','secondary')+
+      '</div></div>'
+    );
+  }
+  return body(
+    heading('회원가입','캠퍼스 시간표 이용을 위한 계정을 등록하세요.')+
+    '<div class="card" style="max-width:420px;margin:24px auto;">'+
+    '<form id="signup-form" class="stack">'+
+    field('학번','<input id="signup-student-id" name="studentId" type="text" placeholder="학번 입력 (예: 20240001)" required autofocus autocomplete="username">')+
+    field('비밀번호','<input id="signup-password" name="password" type="password" placeholder="비밀번호 입력" required autocomplete="new-password">')+
+    field('비밀번호 확인','<input id="signup-password-confirm" name="passwordConfirm" type="password" placeholder="비밀번호 다시 입력" required autocomplete="new-password">')+
+    '<p id="signup-error" class="form-error" role="alert"></p>'+
+    '<button id="signup-submit" type="submit" class="button primary">회원가입</button>'+
+    '<div class="auth-switch-link">'+
+    '<span>이미 계정이 있으신가요?</span>'+
+    '<a href="#login">로그인</a>'+
+    '</div>'+
+    '</form>'+
+    '</div>'
+  );
+}
+
 const views={start:startView,courses:coursesView,preferences:preferencesView,advanced:advancedView,results:resultsView,saved:savedView,career:careerView,'career-list':careerListView,calendar:calendarView,export:exportView,experience:experienceView,record:recordView,empty:emptyView,loading:loadingView,error:errorView,ai:aiView};
 views.programs=()=>body(programView({goal:state.programGoal,busy:state.programBusy,loading:state.programLoading,meta:state.programMeta,error:state.programError,list:programStore.list,includeUpcoming:state.programUpcoming,storageError:programStore.error}),'program-body')+bottomNav('programs');
+views.login=loginView;views.signup=signupView;
 function render(motion='none'){
   const sameRoute=$('content')?.dataset.route===state.route,focused=document.activeElement;
   const scrollTop=sameRoute?document.querySelector('.screen-body')?.scrollTop||0:0;
@@ -456,7 +530,7 @@ function render(motion='none'){
   calendarWidget?.destroy();
   calendarWidget=null;
   const plannerScreen=['saved','calendar'].includes(state.route)?' planner-screen':'';
-  $('app').innerHTML='<div class="app-shell">'+sidebar()+'<div class="workspace"><header class="desktop-topbar"><span>'+semesterLabel()+'</span><span class="user-label">나의 캠퍼스 '+icon('desktopSaved','imgUser')+'</span></header><main id="content" class="screen '+(wide?'wide':'')+plannerScreen+'" data-route="'+state.route+'">'+renderHeader()+content+'</main></div></div>';
+  $('app').innerHTML='<div class="app-shell">'+sidebar()+'<div class="workspace"><header class="desktop-topbar"><span>'+semesterLabel()+'</span>'+userBar()+'</header><main id="content" class="screen '+(wide?'wide':'')+plannerScreen+'" data-route="'+state.route+'">'+renderHeader()+content+'</main></div></div>';
   syncCourseCompatibility();
   if($('lms-slot')){$('lms-slot').append(lmsHost);lmsHost.hidden=false}
   if($('semester-calendar'))mountSemesterCalendar();
@@ -654,6 +728,17 @@ async function checkConnection(){
 }
 async function act(action,el){
   switch(action){
+    case 'logout':{
+      try{
+        await auth.logout();
+        state.user=null;
+        flash('로그아웃되었습니다.');
+        render();
+      }catch(err){
+        flash(err.message,true);
+      }
+      break;
+    }
     case 'back':back();break;
     case 'new':go('courses');break;
     case 'course':toggleCourseSelection(el.dataset.id);break;
@@ -823,8 +908,58 @@ document.addEventListener('change',e=>{
   if(el.id==='show-calendar-classes'){state.showCalendarClasses=el.checked;calendarWidget?.refetchEvents()}
   if(el.form?.id==='event-form')readEventDraft(el.form);
 });
+
+async function handleLoginSubmit(form){
+  const studentId=form.studentId.value.trim();
+  const password=form.password.value;
+  const errorEl=$('login-error');
+  const btn=$('login-submit');
+  errorEl.textContent='';
+  btn.disabled=true;
+  btn.textContent='로그인 중...';
+  try{
+    const res=await auth.login({studentId,password});
+    state.user=res.user;
+    flash((res.user?.studentId||studentId)+'님, 로그인되었습니다!');
+    go('start');
+  }catch(err){
+    errorEl.textContent=err.message;
+  }finally{
+    btn.disabled=false;
+    btn.textContent='로그인';
+  }
+}
+async function handleSignupSubmit(form){
+  const studentId=form.studentId.value.trim();
+  const password=form.password.value;
+  const passwordConfirm=form.passwordConfirm.value;
+  const errorEl=$('signup-error');
+  const btn=$('signup-submit');
+  errorEl.textContent='';
+  if(password!==passwordConfirm){
+    errorEl.textContent='비밀번호가 일치하지 않습니다.';
+    return;
+  }
+  btn.disabled=true;
+  btn.textContent='가입 처리 중...';
+  try{
+    await auth.signup({studentId,password});
+    flash('회원가입에 성공했습니다! 로그인해 주세요.');
+    go('login');
+  }catch(err){
+    errorEl.textContent=err.message;
+  }finally{
+    btn.disabled=false;
+    btn.textContent='회원가입';
+  }
+}
+
 document.addEventListener('submit',e=>{
-  e.preventDefault();if(e.target.id==='relax-form'){
+  e.preventDefault();if(e.target.id==='login-form'){
+      handleLoginSubmit(e.target);
+    }else if(e.target.id==='signup-form'){
+      handleSignupSubmit(e.target);
+    }else if(e.target.id==='relax-form'){
     try{const request=structuredClone(state.request);request.relaxationPolicy=relaxationPolicy(request,e.target);closeDialog();recommend('relax',request)}catch(error){$('relax-error').textContent=error.message}
   }else if(e.target.id==='semester-form'){
     try{
@@ -901,4 +1036,11 @@ async function init(){
     })}
   }catch(error){state.error=error.message;state.route='error';render()}
 }
+
+auth.getMe().then(user=>{
+  if((state.user?.studentId||null)!==(user?.studentId||null)){
+    state.user=user;
+    render();
+  }
+}).catch(()=>{});
 init();

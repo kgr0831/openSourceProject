@@ -15,7 +15,7 @@ import {friendlyError} from '../lms-parser/errors.mjs';
 
 const root=path.dirname(fileURLToPath(import.meta.url));
 function reply(res,status,data,type='application/json; charset=utf-8'){
-  res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'"});
+  res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' http://localhost:4000 http://127.0.0.1:4000; object-src 'none'; base-uri 'none'; frame-ancestors 'self'"});
   res.end(type.startsWith('application/json')?JSON.stringify(data):data);
 }
 async function readJson(req){
@@ -41,6 +41,7 @@ files['/calendar-view.js']=['calendar-view.js','text/javascript; charset=utf-8']
 files['/calendar.css']=['calendar.css','text/css; charset=utf-8'];
 files['/lms.css']=['lms.css','text/css; charset=utf-8'];
 files['/walking-route-times.mjs']=['walking-route-times.mjs','text/javascript; charset=utf-8'];
+files['/auth.js']=['auth.js','text/javascript; charset=utf-8'];
 const calendarAssets=new Map([
   ['calendar.js','all/global.js'], ['theme.js','themes/monarch/global.js'], ['ko.js','locales/ko/global.js'],
   ['skeleton.css','skeleton.css'], ['theme.css','themes/monarch/theme.css'], ['palette.css','themes/monarch/palettes/blue.css']
