@@ -1,20 +1,20 @@
 :root {
-  --fc-monarch-primary: #3a72f5;
-  --fc-monarch-primary-over: #2b5fe0;
-  --fc-monarch-primary-down: #2149b5;
-  --fc-monarch-secondary: #eef4ff;
-  --fc-monarch-secondary-foreground: #2149b5;
-  --fc-monarch-secondary-over: #dce8ff;
-  --fc-monarch-secondary-down: #bcd2ff;
-  --fc-monarch-tertiary: #3a72f5;
+  --fc-monarch-primary: #2f5bea;
+  --fc-monarch-primary-over: #244bd0;
+  --fc-monarch-primary-down: #1c3da8;
+  --fc-monarch-secondary: #f3f4f6;
+  --fc-monarch-secondary-foreground: #17181c;
+  --fc-monarch-secondary-over: #e9ebee;
+  --fc-monarch-secondary-down: #d3d6db;
+  --fc-monarch-tertiary: #2f5bea;
   --fc-monarch-tertiary-foreground: #ffffff;
-  --fc-monarch-tertiary-over: #2b5fe0;
-  --fc-monarch-tertiary-down: #2149b5;
-  --fc-monarch-highlight: #3a72f51f;
-  --fc-monarch-selected: #3a72f5;
-  --fc-monarch-selected-over: #2b5fe0;
-  --fc-monarch-selected-down: #2149b5;
-  --fc-monarch-outline: #3a72f5;
+  --fc-monarch-tertiary-over: #244bd0;
+  --fc-monarch-tertiary-down: #1c3da8;
+  --fc-monarch-highlight: #2f5bea1a;
+  --fc-monarch-selected: #2f5bea;
+  --fc-monarch-selected-over: #244bd0;
+  --fc-monarch-selected-down: #1c3da8;
+  --fc-monarch-outline: #2f5bea;
 }
 
 .planner-screen :is(.button, .bottom-nav a),
@@ -28,19 +28,13 @@
   flex-shrink: 0;
 }
 
-.planner-screen .timetable-surface,
 .calendar-surface {
   min-inline-size: 0;
-  padding: clamp(8px, 1.5vw, 16px);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: var(--shadow-xs);
 }
 
 .planner-grid-frame {
   min-inline-size: 0;
-  container-type: inline-size;
+  container: planner-grid / inline-size;
 }
 
 .planner-grid-guide {
@@ -61,39 +55,14 @@
   border-radius: 10px;
 }
 
-@container (width < 51rem) {
+@container planner-grid (width < 51rem) {
   .calendar-surface .planner-grid-frame[data-mode="week"] .planner-grid-guide { display: block; }
 }
 
+/* The saved week scrolls with the page, so it keeps a fixed hour height instead of fitting a pane. */
 .planner-screen .timetable {
-  --hour-height: 60px;
-  --gutter: 38px;
-  margin: 0;
-}
-
-/* Phones keep Monday to Friday on one screen: shorter hours, the room under the name, no time line. */
-@container (width < 40rem) {
-  .planner-screen .planner-grid-frame .timetable { --hour-height: 48px; --gutter: 20px; }
-  .planner-screen .planner-grid-frame .week-header { block-size: 32px; font-size: 0.8125rem; }
-  .planner-screen .planner-grid-frame .class-block { inset-inline: 1px; padding: 3px 2px 3px 4px; }
-  .planner-screen .planner-grid-frame .class-block strong { font-size: 0.6875rem; }
-  .planner-screen .planner-grid-frame .class-block .class-detail { font-size: 0.6875rem; }
-  .planner-screen .planner-grid-frame .class-detail span:first-child { display: none; }
-  .planner-screen .planner-grid-frame .class-detail span:last-child { white-space: normal; }
-}
-
-.planner-screen .week-header {
-  block-size: 44px;
-  font-size: 0.875rem;
-}
-
-.planner-screen .hour {
-  font-size: 0.75rem;
-}
-
-.planner-screen .class-block {
-  padding: 4px 6px;
-  border-inline-start-width: 3px;
+  --hour-height: clamp(58px, calc((100dvh - 250px) / 9), 76px);
+  --gutter: 30px;
 }
 
 .planner-screen .class-block strong {
@@ -106,9 +75,8 @@
 .planner-screen .class-block .class-detail {
   display: block;
   max-inline-size: 100%;
-  margin: 3px 0 0;
   font-size: 0.75rem;
-  line-height: 1.24;
+  line-height: 1.25;
 }
 
 .planner-screen .class-detail span {
@@ -117,6 +85,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Phones keep Monday to Friday on one screen: the name on two lines at most, the room on one, no time line. */
+@container planner-grid (width < 40rem) {
+  .planner-screen .planner-grid-frame .timetable { --hour-height: 56px; --gutter: 24px; }
+  .planner-screen .planner-grid-frame .class-block { padding: 4px 3px 3px 4px; }
+  .planner-screen .planner-grid-frame .class-block strong { font-size: 0.75rem; }
+  .planner-screen .planner-grid-frame .class-detail span:first-child:not(.room) { display: none; }
+}
+
 
 .calendar-toolbar,
 .calendar-mode,
@@ -209,8 +186,8 @@
 }
 
 #semester-calendar [data-calendar-selected] {
-  background: var(--blue-50);
-  box-shadow: inset 0 2px var(--blue-500);
+  background: var(--brand-soft);
+  box-shadow: inset 0 2px var(--brand);
 }
 
 #semester-calendar .calendar-event {
@@ -263,6 +240,29 @@
 .calendar-event-exam .calendar-event-kind,
 .calendar-event-makeup .calendar-event-kind {
   box-shadow: inset 0 0 0 1px var(--calendar-event-stroke);
+}
+
+#semester-calendar .calendar-event.course-colored {
+  border-inline-start-color: var(--block);
+  background-color: var(--block);
+  color: #fff;
+}
+
+.course-colored .calendar-event-content {
+  color: #fff;
+}
+
+.course-colored .calendar-event-kind {
+  background: #fff;
+  color: var(--block-ink);
+}
+
+.calendar-event-class:not(.calendar-event-cancelled) .calendar-event-kind {
+  display: none;
+}
+
+#semester-calendar .calendar-event.calendar-event-cancelled .calendar-event-content {
+  color: var(--ink-2);
 }
 
 #semester-calendar .calendar-event-cancelled {

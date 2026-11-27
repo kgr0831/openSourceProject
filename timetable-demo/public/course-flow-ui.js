@@ -49,8 +49,8 @@ function courseTimeDetails(group, open) {
   const messages = count ? [] : [...new Set(options.flatMap(sectionMessages))].slice(0, 2);
   if (missingTimes && count) messages.push('시간을 확인할 수 없는 분반도 있어요.');
   return '<details class="course-time-detail" data-course-time="'+esc(course.id)+'" '+(open ? 'open' : '')+'>'+
-    '<summary><strong>'+esc(course.name)+'</strong> <span data-matching="'+count+'">'+options.length+
-    '개 분반 중 '+count+'개가 현재 요일·시간에 맞아요</span></summary>'+
+    '<summary><strong>'+esc(course.name)+'</strong> <span data-matching="'+count+'" aria-label="'+options.length+
+    '개 분반 중 '+count+'개가 현재 요일·시간에 맞아요">'+(!count ? '맞는 분반 없음' : count === options.length ? count+'개 모두 가능' : options.length+'개 중 '+count+'개 가능')+'</span></summary>'+
     '<ul class="section-time-options">'+options.map(sectionTimeDetails).join('')+'</ul></details>'+
     messages.map(message => '<p class="course-time-reason">'+esc(message)+'</p>').join('');
 }

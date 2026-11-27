@@ -1,3 +1,4 @@
+import {courseColor} from './ui.js';
 import {calendarTimeZone, calendarViews, koreanDate} from './calendar-display.mjs';
 import {timeValue} from './planner-core.mjs';
 
@@ -71,6 +72,7 @@ export function mountCalendar(element, {mode, date, selectedDate, weekBounds, ev
       el.style.setProperty('--calendar-event-fill', colors.fill);
       el.style.setProperty('--calendar-event-stroke', colors.stroke);
       el.style.setProperty('--calendar-event-ink', colors.ink);
+      if (event.extendedProps.courseId) el.classList.add('course-colored', courseColor(event.extendedProps.courseId));
       const summary = [label, event.title, time, location].filter(Boolean).join(' · ');
       el.setAttribute('aria-label', summary);
       el.title = summary;
