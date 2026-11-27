@@ -38,14 +38,16 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
   let page=await context.newPage();page.on('pageerror',error=>failures.push(error.message));
   await page.emulateMedia({reducedMotion:'reduce'});
   const base=`http://127.0.0.1:${server.address().port}`;
-  await page.goto(base+'/#signup');await page.locator('main[data-route="start"]').waitFor();
-  assert.equal(await page.locator('.sidebar .avatar').count(),0);
-  await page.locator('.shortcut-list a[href="#login"]').click();
+  // A first visit lands on the landing page; its 로그인 link opens the account screen.
+  await page.goto(base+'/#signup');await page.locator('main[data-route="welcome"]').waitFor();
+  await page.locator('.landing-bar a[href="#login"]').click();assert.equal(await page.locator('.sidebar .avatar').count(),0);
   await page.locator('#lms-connect:not([disabled])').waitFor();assert.equal(await page.locator('#lms-signin input[type="password"]').count(),1);await page.locator('#lms-connect').click();
   await page.locator('#lms-confirm').click();
   await page.locator('#lms-course-picker').waitFor({state:'visible'});
   assert.equal(await page.locator('.sidebar .avatar').innerText(),'김');assert.equal(await page.locator('#lms-connection-title').innerText(),'김숭실');
-  assert.equal(await page.locator('#lms-courses input:checked').count(),0);
+  // This semester's courses start ticked; clearing them disables the import.
+  assert.equal(await page.locator('#lms-courses input:checked').count(),2);assert.equal(await page.locator('#lms-sync').isDisabled(),false);
+  await page.locator('#lms-clear').click();assert.equal(await page.locator('#lms-courses input:checked').count(),0);
   assert.equal(await page.locator('#lms-sync').isDisabled(),true);
   await page.locator('#lms-search').fill('기초');assert.equal(await page.locator('#lms-courses label').count(),1);
   await page.locator('#lms-courses input[value="10"]').check();await page.locator('#lms-sync').click();
@@ -94,7 +96,7 @@ test('학교 연결 → 선택 과목 → 캘린더 갱신·재실행·ICS·로�
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ssu-timetable-planner-v1')).events.length),manualCount);
   await page.evaluate(()=>location.hash='login');currentUser=100;loggedIn=false;await page.locator('#lms-connect').click();await page.locator('#lms-confirm').click();
   await page.locator('#lms-course-picker').waitFor({state:'visible'});
-  assert.equal(await page.locator('#lms-result').isVisible(),false);assert.equal(await page.locator('#lms-courses input:checked').count(),0);
+  assert.equal(await page.locator('#lms-result').isVisible(),false);assert.equal(await page.locator('#lms-courses input:checked').count(),2);
   // Signing in with the school ID and password: a refusal says why and empties the password; the right one signs in.
   await page.locator('#lms-disconnect').click();await page.locator('#lms-signin').waitFor({state:'visible'});
   await page.locator('#lms-user-id').fill('20201234');await page.locator('#lms-password').fill('wrong-pass');await page.locator('#lms-signin-submit').click();
