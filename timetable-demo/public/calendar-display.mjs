@@ -83,7 +83,8 @@ export function toCalendarEvents(events, {showClasses = true} = {}) {
       id: event.id, title: event.title, start, ...(end ? {end} : {}), allDay: lms && event.allDay,
       color: colors.fill,
       extendedProps: {date: event.date, kind: event.kind, label: eventKindLabel(event), status: event.status,
-        location: event.location, time: eventTimeLabel(event), point: lms && event.point, colors}
+        location: event.location, time: eventTimeLabel(event), point: lms && event.point, colors,
+        courseId: lms ? null : event.courseId}
     };
   });
 }

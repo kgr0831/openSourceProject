@@ -1,4 +1,4 @@
-import {esc,field,button,dayNames} from './ui.js';
+import {esc,icon,field,button,dayNames} from './ui.js';
 import {timeText} from './planner-core.mjs';
 import {relaxationChoices,relaxationRule} from './relaxation-options.mjs';
 
@@ -25,7 +25,7 @@ export function updateHardCondition(r,element){
 }
 export function relaxationDialog(r){
   const choices=relaxationChoices(r);
-  return '<div class="dialog-heading"><h2 id="dialog-title">어디까지 바꿔도 괜찮나요?</h2>'+button('×','close-dialog','icon-button','aria-label="닫기"')+'</div><p>선택한 항목 중 가장 적게 바꾸는 방법을 찾아요. 과목·요일·시간과 전공·교양 학점 조건은 유지해요.</p><form id="relax-form" class="stack">'+Object.entries(choices).map(([key,item])=>'<label class="replace-confirm"><input type="checkbox" name="'+key+'">'+esc(item.label)+'</label>').join('')+field('한 번에 바꿀 항목 수',select('relax-count',[[1,'최대 1개'],[2,'최대 2개']],1))+'<small>모든 항목의 중요도는 같아요. 변경된 조건을 확인한 뒤 시간표를 저장할 수 있어요.</small><p id="relax-error" class="form-error" role="alert"></p><button type="submit" class="button primary">허용한 범위에서 찾기</button></form>';
+  return '<div class="dialog-heading"><h2 id="dialog-title">어디까지 바꿔도 괜찮나요?</h2>'+button(icon('close'),'close-dialog','icon-button','aria-label="닫기"')+'</div><p>선택한 항목 중 가장 적게 바꾸는 방법을 찾아요. 과목·요일·시간과 전공·교양 학점 조건은 유지해요.</p><form id="relax-form" class="stack">'+Object.entries(choices).map(([key,item])=>'<label class="replace-confirm"><input type="checkbox" name="'+key+'">'+esc(item.label)+'</label>').join('')+field('한 번에 바꿀 항목 수',select('relax-count',[[1,'최대 1개'],[2,'최대 2개']],1))+'<small>모든 항목의 중요도는 같아요. 변경된 조건을 확인한 뒤 시간표를 저장할 수 있어요.</small><p id="relax-error" class="form-error" role="alert"></p><button type="submit" class="button primary">허용한 범위에서 찾기</button></form>';
 }
 export function relaxationPolicy(r,form){
   const values=new FormData(form),rules={};

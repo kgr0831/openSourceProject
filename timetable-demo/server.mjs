@@ -93,7 +93,7 @@ const server=http.createServer(async(req,res)=>{
       const scope={term:url.searchParams.get('term')??defaultRequest.term,department:url.searchParams.get('department')??defaultRequest.department};
       const selected=getCourses(scope);
       return reply(res,200,{courses:selected.map(({sections,...course})=>({...course,
-        offerings:sections.map(s=>({courseNumber:s.courseNumber,offeredBy:s.offeredBy,available:!s.unavailableReason})),
+        offerings:sections.map(s=>({courseNumber:s.courseNumber,offeredBy:s.offeredBy,available:!s.unavailableReason,meetings:s.meetings,instructor:s.instructor})),
         facets:courseFacets(sections),sectionCount:sections.length,availableSectionCount:sections.filter(section=>section.meetings.length).length})),
         defaultRequest:{...defaultRequest,...scope},catalogInfo:{...catalogInfo,...scope,careerDataVersion:scheduler.careerDataVersion,
           majorCount:selected.filter(course=>course.kind==='major').length,generalCount:selected.filter(course=>course.kind==='general').length,
