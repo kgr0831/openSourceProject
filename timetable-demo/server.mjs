@@ -82,7 +82,7 @@ const server=http.createServer(async(req,res)=>{
       try{return reply(res,200,await readFile(path.join(root,'node_modules','fullcalendar',file)),type)}
       catch(error){if(error.code==='ENOENT')return reply(res,404,{error:'캘린더 구성 요소를 먼저 설치해 주세요.'});throw error}
     }
-    if(req.method==='GET' && /^\/assets\/(?:favicon\.svg|ibm-plex-sans-kr-(?:400|500|600|700)\.woff2|OFL-IBMPlexSansKR\.txt)$/.test(url.pathname)){
+    if(req.method==='GET' && /^\/assets\/(?:favicon\.svg|pretendard-(?:400|500|600|700)\.woff2|OFL-Pretendard\.txt)$/.test(url.pathname)){
       const type=url.pathname.endsWith('.svg')?'image/svg+xml':url.pathname.endsWith('.woff2')?'font/woff2':'text/plain; charset=utf-8';
       try{return reply(res,200,await readFile(path.join(root,'public',url.pathname.slice(1))),type)}
       catch(error){if(error.code==='ENOENT')return reply(res,404,{error:'파일을 찾을 수 없습니다.'});throw error}

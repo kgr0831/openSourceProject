@@ -48,7 +48,7 @@ AI 추천은 생활 패턴 화면의 **문장으로 요청하고 싶다면**에�
 
 - 화면 구조는 [Figma 와이어플로우](https://www.figma.com/design/Go4LKEoQgM5IY2eT2QsePG?node-id=53-2)(HI 페이지)를 따릅니다. PC는 상단 내비게이션(홈·시간표 만들기·진로·캘린더)과 과목 담기 오른쪽의 '내 학기' 요약, 모바일은 하단 탭과 고정 액션 바를 씁니다. 색·글자·간격은 KRDS처럼 기본 토큰 위에 의미 토큰을 얹은 `public/style.css` 상단 변수에서 관리합니다.
 - 차콜·블루와 과목별 세이지·라벤더·블루·피치·샌드 색상, 흰 카드와 미세한 그림자를 사용합니다. 그라데이션은 없습니다.
-- 기존 HTML/CSS/JavaScript와 Node 서버를 유지하며, 추천 계산은 Python의 OR-Tools 9.15.6755를 사용합니다. LMS 연결은 공통 파서의 Cheerio·Playwright를 사용합니다. 아이콘은 `public/ui.js`의 인라인 SVG, 글꼴은 로컬 IBM Plex Sans KR 400·500·600·700입니다. 글꼴 라이선스는 `public/assets/OFL-IBMPlexSansKR.txt`에 있습니다.
+- 기존 HTML/CSS/JavaScript와 Node 서버를 유지하며, 추천 계산은 Python의 OR-Tools 9.15.6755를 사용합니다. LMS 연결은 공통 파서의 Cheerio·Playwright를 사용합니다. 아이콘은 `public/ui.js`의 인라인 SVG, 글꼴은 로컬 Pretendard 400·500·600·700(KS X 1001 서브셋)입니다. 글꼴 라이선스는 `public/assets/OFL-Pretendard.txt`에 있습니다.
 - `public/app.js`: 단계별 화면·탐색·API 연결. `public/ui.js`: 공통 UI·시간표·비교안 선택. `public/style.css`: 모바일·PC 스타일. `public/planner.js`: 기존 저장 형식을 유지하는 브라우저 저장소.
 - 추천 실패·빈 결과·진행 중 화면, 키보드 모달 닫기, 화면 읽기용 레이블, 동작 줄이기 설정을 지원합니다.
 - 화면 진입·추천안 전환·탭 이동·과목 선택·모달·알림에 짧은 애니메이션을 적용했습니다. 기기의 동작 줄이기 설정을 따르면 모션을 끄며, 과목 선택 시 키보드 포커스와 스크롤 위치를 유지합니다. 모바일의 내용 영역과 하단 버튼을 분리해 버튼이 내용을 가리지 않도록 했습니다.

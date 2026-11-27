@@ -1,24 +1,20 @@
 :root {
-  --fc-monarch-primary: #18233a;
-  --fc-monarch-primary-over: #36425a;
-  --fc-monarch-primary-down: #5b6577;
-  --fc-monarch-secondary: #fff6c7;
-  --fc-monarch-secondary-foreground: #18233a;
-  --fc-monarch-secondary-over: #fff0a8;
-  --fc-monarch-secondary-down: #ffe98a;
-  --fc-monarch-tertiary: #ffe45c;
-  --fc-monarch-tertiary-foreground: #18233a;
-  --fc-monarch-tertiary-over: #f5d84a;
-  --fc-monarch-tertiary-down: #ebcd3c;
-  --fc-monarch-highlight: #ffe45c33;
-  --fc-monarch-selected: #18233a;
-  --fc-monarch-selected-over: #36425a;
-  --fc-monarch-selected-down: #5b6577;
-  --fc-monarch-outline: #2f5bea;
-}
-
-.planner-screen .screen-body {
-  --content: 1440px;
+  --fc-monarch-primary: #3a72f5;
+  --fc-monarch-primary-over: #2b5fe0;
+  --fc-monarch-primary-down: #2149b5;
+  --fc-monarch-secondary: #eef4ff;
+  --fc-monarch-secondary-foreground: #2149b5;
+  --fc-monarch-secondary-over: #dce8ff;
+  --fc-monarch-secondary-down: #bcd2ff;
+  --fc-monarch-tertiary: #3a72f5;
+  --fc-monarch-tertiary-foreground: #ffffff;
+  --fc-monarch-tertiary-over: #2b5fe0;
+  --fc-monarch-tertiary-down: #2149b5;
+  --fc-monarch-highlight: #3a72f51f;
+  --fc-monarch-selected: #3a72f5;
+  --fc-monarch-selected-over: #2b5fe0;
+  --fc-monarch-selected-down: #2149b5;
+  --fc-monarch-outline: #3a72f5;
 }
 
 .planner-screen :is(.button, .bottom-nav a),
@@ -37,8 +33,9 @@
   min-inline-size: 0;
   padding: clamp(8px, 1.5vw, 16px);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 14px;
   background: #fff;
+  box-shadow: var(--shadow-xs);
 }
 
 .planner-grid-frame {
@@ -64,19 +61,25 @@
   border-radius: 10px;
 }
 
-@container (width < 40rem) {
-  .timetable-surface .planner-grid-guide { display: block; }
-}
-
 @container (width < 51rem) {
   .calendar-surface .planner-grid-frame[data-mode="week"] .planner-grid-guide { display: block; }
 }
 
 .planner-screen .timetable {
-  min-inline-size: 40rem;
-  --hour-height: 72px;
+  --hour-height: 60px;
   --gutter: 38px;
   margin: 0;
+}
+
+/* Phones keep Monday to Friday on one screen: shorter hours, the room under the name, no time line. */
+@container (width < 40rem) {
+  .planner-screen .planner-grid-frame .timetable { --hour-height: 48px; --gutter: 20px; }
+  .planner-screen .planner-grid-frame .week-header { block-size: 32px; font-size: 0.8125rem; }
+  .planner-screen .planner-grid-frame .class-block { inset-inline: 1px; padding: 3px 2px 3px 4px; }
+  .planner-screen .planner-grid-frame .class-block strong { font-size: 0.6875rem; }
+  .planner-screen .planner-grid-frame .class-block .class-detail { font-size: 0.6875rem; }
+  .planner-screen .planner-grid-frame .class-detail span:first-child { display: none; }
+  .planner-screen .planner-grid-frame .class-detail span:last-child { white-space: normal; }
 }
 
 .planner-screen .week-header {
@@ -206,8 +209,8 @@
 }
 
 #semester-calendar [data-calendar-selected] {
-  background: var(--marker-soft);
-  box-shadow: inset 0 3px var(--ink-900);
+  background: var(--blue-50);
+  box-shadow: inset 0 2px var(--blue-500);
 }
 
 #semester-calendar .calendar-event {
