@@ -1,3 +1,4 @@
+import {setTimeout as delay} from 'node:timers/promises';
 import {chromium} from 'playwright';
 import {load} from 'cheerio';
 import {CANVAS, PORTAL} from './http.mjs';
@@ -6,6 +7,24 @@ import {LmsError} from './errors.mjs';
 
 const closedError = () => new LmsError('BROWSER_CLOSED', '학교 연결이 끊겼습니다. 다시 연결해 주세요.');
 const authError = () => new LmsError('AUTH_REQUIRED', '학교 로그인이 만료되었습니다. 다시 연결해 주세요.');
+const safeOrigin = value => { try { return new URL(value).origin; } catch { return ''; } };
+
+// For a server with several students: one hidden browser, one isolated context per session. Pass the result as `launch`.
+export function sharedBrowser(open = () => chromium.launch({headless: true})) {
+  let opening = null, browser = null;
+  return async () => {
+    if (!browser?.isConnected()) browser = await (opening ||= Promise.resolve().then(open).finally(() => { opening = null; }));
+    const shared = browser, contexts = new Set();
+    return {
+      isConnected: () => shared.isConnected(),
+      async newContext(options) { const context = await shared.newContext(options); contexts.add(context); return context; },
+      async close() {
+        await Promise.all([...contexts].map(context => context.close().catch(() => {}))); contexts.clear();
+        if (shared.isConnected() && !shared.contexts().length) await shared.close().catch(() => {});
+      },
+    };
+  };
+}
 
 export async function browserSession({channel = 'chrome', store, canvas = CANVAS, portal = PORTAL,
   launch = options => chromium.launch(options)} = {}) {
@@ -106,6 +125,37 @@ export async function browserSession({channel = 'chrome', store, canvas = CANVAS
       await start(false, state);
       try { await page.goto(portal, {waitUntil: 'domcontentloaded'}); }
       catch { throw new LmsError('NETWORK', '학교 로그인 창을 열지 못했습니다. 인터넷 연결을 확인해 주세요.'); }
+    },
+    // Signs in through the school's own form in a hidden browser. The password is typed into that form and kept nowhere:
+    // not on this object, not in errors, not on disk. Only the resulting school session is saved, as with a window login.
+    async passwordLogin({userId, password}) {
+      let state;
+      if (browser?.isConnected()) state = await context.storageState({indexedDB: true});
+      await start(true, state);
+      let refused = false, formUrl;
+      // The school answers a wrong ID or password with an alert from its hidden result frame.
+      page.on('dialog', dialog => { refused = true; dialog.dismiss().catch(() => {}); });
+      try {
+        await page.goto(`${portal}/login`, {waitUntil: 'domcontentloaded', timeout: 30000});
+        await page.locator('a[href*="smln.asp"]').first().click({timeout: 15000});
+        await page.locator('#userid').fill(userId, {timeout: 20000});
+        await page.locator('#pwd').fill(password, {timeout: 5000});
+        formUrl = page.url(); refused = false;
+        await page.locator('a.btn_login').click({timeout: 5000});
+      } catch {
+        if (!browser?.isConnected() || closed) throw closedError();
+        throw new LmsError('NETWORK', '학교 로그인 화면을 열지 못했습니다.');
+      }
+      // Leaving the form means the school accepted the sign-in; an alert means it refused.
+      for (const until = Date.now() + 30000; !refused && page.url() === formUrl && Date.now() < until;) await delay(150);
+      if (refused) throw new LmsError('CREDENTIALS', '아이디 또는 비밀번호가 맞지 않습니다.');
+      if (page.url() === formUrl) throw new LmsError('LOGIN_INCOMPLETE', '학교 로그인이 끝나지 않았습니다.');
+      // Let the school's redirects finish setting its cookies before asking who signed in.
+      for (const until = Date.now() + 20000; ![portal, canvas].includes(safeOrigin(page.url())) && Date.now() < until;) await delay(150);
+      await page.waitForLoadState('load', {timeout: 20000}).catch(() => {});
+      if (!browser?.isConnected() || closed) throw closedError();
+      if (!await session.ensureLogin()) throw new LmsError('LOGIN_INCOMPLETE', '학교 로그인이 끝나지 않았습니다.');
+      await page.goto('about:blank').catch(() => {});
     },
     async focusLogin() {
       const live = requireContext().pages().filter(tab => !tab.isClosed());

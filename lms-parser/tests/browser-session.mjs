@@ -84,3 +84,64 @@ test('실제 Chrome에서 로그인→숨김 전환→암호화 재시작 복원
   userId = 100;
   await assert.rejects(restored.ensureLogin(), {code: 'AUTH_REQUIRED'});
 });
+
+// A stand-in for the school's sign-in pages with the same shape: a portal link to the SSO form, the form posting
+// into a hidden frame, an alert on refusal, and a redirect back through the portal on success.
+function schoolFixture() {
+  const sessions = new Set(); let sequence = 0, posts = [];
+  const page = body => `<!doctype html><meta charset="utf-8">${body}`;
+  const server = http.createServer(async (req, res) => {
+    const url = new URL(req.url, 'http://fixture'), cookie = (req.headers.cookie || '').match(/fixture_session=([\w-]+)/)?.[1];
+    const valid = sessions.has(cookie);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    if (url.pathname === '/api/v1/users/self') {
+      if (!valid) { res.writeHead(401); res.end('{}'); return; }
+      res.setHeader('Content-Type', 'application/json'); res.end('while(1);' + JSON.stringify({id: Number(cookie.split('-')[1])})); return;
+    }
+    if (url.pathname === '/login') { res.end(page('<div class="login_btn"><a href="/Symtra_sso/smln.asp?apiReturnUrl=%2Fxn-sso%2Fgw-cb.php"><span>통합 로그인</span></a></div>')); return; }
+    if (url.pathname === '/Symtra_sso/smln.asp') {
+      res.end(page(`<FORM METHOD=POST ACTION="smln_pcs.asp" name="LoginInfo" target="pFrame"><input type="hidden" name="in_tp_bit" value="0" />
+        <input type="text" name="userid" id="userid" maxlength="20"/><input type="password" name="pwd" id="pwd" maxlength="20"/>
+        <a href="JavaScript:LoginInfoSend('LoginInfo');" class="btn_login">로그인</a></FORM>
+        <IFRAME id="pFrame" style="DISPLAY:none;" name="pFrame"></IFRAME>
+        <script>function LoginInfoSend(x){var f=document[x];if(f.userid.value==""||f.pwd.value=="")return;f.submit();}</script>`)); return;
+    }
+    if (url.pathname === '/Symtra_sso/smln_pcs.asp' && req.method === 'POST') {
+      let body = ''; for await (const chunk of req) body += chunk;
+      const form = new URLSearchParams(body); posts.push(form.get('userid'));
+      if (form.get('pwd') !== 'right-' + form.get('userid')) { res.end(page('<script>alert("아이디와 비밀번호가 일치하지 않거나 잘못되었습니다.");parent.document.LoginInfo.userid.focus();</script>')); return; }
+      res.end(page(`<script>parent.location.href="/xn-sso/gw-cb.php?sToken=${form.get('userid')}";</script>`)); return;
+    }
+    if (url.pathname === '/xn-sso/gw-cb.php') {
+      const id = `u-${url.searchParams.get('sToken')}-${++sequence}`; sessions.add(id);
+      res.writeHead(302, {'Set-Cookie': `fixture_session=${id}; Path=/; HttpOnly; SameSite=Lax`, Location: '/'}); res.end(); return;
+    }
+    if (url.pathname === '/courses' && valid) { res.end(page(`<main>내 과목</main><script>window.ENV={current_user_id:${Number(cookie.split('-')[1])}}</script>`)); return; }
+    res.end(page('<main>포털</main>'));
+  });
+  return {server, posts: () => posts};
+}
+
+test('실제 Chrome에서 학교 폼에 아이디·비밀번호를 넣어 로그인하고, 거절과 여러 학생의 분리를 확인한다', {skip: process.platform !== 'win32'}, async t => {
+  const {sharedBrowser} = await import('../browser.mjs');
+  const {server, posts} = schoolFixture();
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  let opened = null;
+  const launch = sharedBrowser(async () => (opened = await chromium.launch({channel: 'chrome', headless: true})));
+  const create = () => browserSession({channel: 'chromium', canvas: origin, portal: origin, launch});
+  const first = await create(), second = await create();
+  t.after(async () => { await first.close(); await second.close(); await opened?.close(); await new Promise(resolve => server.close(resolve)); });
+
+  await assert.rejects(first.passwordLogin({userId: '20201234', password: 'wrong'}), {code: 'CREDENTIALS'});
+  await first.passwordLogin({userId: '20201234', password: 'right-20201234'});
+  assert.equal((await first.ensureLogin()).id, 20201234);
+  // The second student shares the browser process but not the first student's school session.
+  assert.equal(opened.contexts().length >= 1, true);
+  await second.passwordLogin({userId: '20205678', password: 'right-20205678'});
+  assert.equal((await second.ensureLogin()).id, 20205678);
+  assert.equal((await first.ensureLogin()).id, 20201234);
+  assert.deepEqual(posts(), ['20201234', '20201234', '20205678']);
+  await first.close(); assert.equal(opened.isConnected(), true);
+  await second.close(); assert.equal(opened.isConnected(), false);
+});

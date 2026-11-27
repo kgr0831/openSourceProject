@@ -8,14 +8,14 @@ import {SessionStore} from './session-store.mjs';
 
 // Shared connection lifecycle; no HTTP listener, UI, downloads or exports.
 export class LmsConnection {
-  constructor({createSession, createClient, sessionStore, loginInterval = 1200, demo = false} = {}) {
+  constructor({createSession, createClient, sessionStore, loginInterval = 1200, demo = false, windowLogin = true} = {}) {
     this.sessionStore = sessionStore || (!createSession ? new SessionStore() : null);
     this.createSession = createSession || (async () => (await import('./browser.mjs')).browserSession({channel: 'auto', store: this.sessionStore}));
     this.createClient = createClient || ((session, signal) => new HttpClient({cookies: session.cookies,
       receiveCookies: session.receiveCookies, refreshAuth: session.ensureLogin, learningxAuth: session.learningxAuth, signal}));
     this.loginInterval = loginInterval;
     this.session = null; this.generation = 0; this.resultDirectory = null;
-    this.state = {revision: 0, instanceId: randomUUID(), accountKey: null, accountName: null, demo, connection: 'disconnected', remembered: false, courses: [], notice: null, job: null, result: null};
+    this.state = {revision: 0, instanceId: randomUUID(), accountKey: null, accountName: null, demo, windowLogin, connection: 'disconnected', remembered: false, courses: [], notice: null, job: null, result: null};
   }
 
   update(patch) { Object.assign(this.state, patch); this.state.revision++; }
@@ -24,14 +24,52 @@ export class LmsConnection {
 
   resume() { this.connect({interactive: false}); }
 
-  connect({interactive = true} = {}) {
-    if (this.running || ['restoring', 'opening', 'waiting', 'checking', 'loading', 'background', 'disconnecting'].includes(this.state.connection)) throw new LmsError('BUSY', 'busy');
+  // Shared start of every login: nothing else may be running, and the previous school session is replaced.
+  begin(connection) {
+    if (this.running || ['restoring', 'opening', 'waiting', 'checking', 'signing', 'loading', 'background', 'disconnecting'].includes(this.state.connection)) throw new LmsError('BUSY', 'busy');
     const generation = ++this.generation;
     this.loginController?.abort(); this.loginController = new AbortController();
     const previous = this.session; this.session = null;
     this.resultDirectory = null;
-    this.update({connection: 'restoring', accountKey: null, accountName: null, courses: [], notice: null, job: null, result: null});
-    this.loginTask = this.runConnection(generation, previous, this.loginController, interactive);
+    this.update({connection, accountKey: null, accountName: null, courses: [], notice: null, job: null, result: null});
+    return {generation, previous, controller: this.loginController};
+  }
+
+  connect({interactive = true} = {}) {
+    if (interactive && !this.state.windowLogin) throw new LmsError('WINDOW_LOGIN', 'no window here');
+    const {generation, previous, controller} = this.begin('restoring');
+    this.loginTask = this.runConnection(generation, previous, controller, interactive);
+  }
+
+  // Sign in with the school ID and password. The password is handed to the session once and never kept in state.
+  signIn({userId, password} = {}) {
+    if (typeof userId !== 'string' || typeof password !== 'string') throw new LmsError('CREDENTIALS_INPUT', 'missing');
+    const id = userId.trim();
+    // The school's own form takes at most 20 characters in each field.
+    if (!id || !password || id.length > 20 || password.length > 20) throw new LmsError('CREDENTIALS_INPUT', 'invalid');
+    const {generation, previous} = this.begin('signing');
+    this.loginTask = this.runSignIn(generation, previous, this.loginController, id, password);
+  }
+
+  async runSignIn(generation, previous, controller, userId, password) {
+    try {
+      await previous?.close().catch(() => {});
+      if (generation !== this.generation) return;
+      const session = await this.createSession();
+      if (generation !== this.generation) { await session.close(); return; }
+      this.session = session;
+      await session.passwordLogin({userId, password});
+      if (generation !== this.generation) return;
+      await this.finishConnection(session, generation, controller);
+    } catch (error) { await this.failConnection(generation, error); }
+  }
+
+  async failConnection(generation, error) {
+    if (generation !== this.generation) return;
+    const session = this.session; this.session = null;
+    await session?.close().catch(() => {});
+    if (generation !== this.generation) return;
+    this.update({connection: 'error', notice: friendlyError(error)});
   }
 
   async runConnection(generation, previous, controller, interactive) {
@@ -67,13 +105,7 @@ export class LmsConnection {
         await delay(this.loginInterval, undefined, {signal: controller.signal});
       }
       if (generation === this.generation) throw new LmsError('AUTH_REQUIRED', 'timeout');
-    } catch (error) {
-      if (generation !== this.generation) return;
-      const session = this.session; this.session = null;
-      await session?.close().catch(() => {});
-      if (generation !== this.generation) return;
-      this.update({connection: 'error', notice: friendlyError(error)});
-    }
+    } catch (error) { await this.failConnection(generation, error); }
   }
 
   async finishConnection(session, generation, controller) {
